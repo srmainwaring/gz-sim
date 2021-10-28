@@ -20,6 +20,8 @@
 #include <gz/math/Vector3.hh>
 
 #include <gz/msgs/Utility.hh>
+#include <gz/msgs/marker.pb.h>
+#include <gz/msgs/wrench_visual.pb.h>
 
 #include "gz/sim/components/AngularAcceleration.hh"
 #include "gz/sim/components/AngularVelocity.hh"
@@ -47,6 +49,9 @@ class gz::sim::LinkPrivate
 {
   /// \brief Id of link entity.
   public: Entity id{kNullEntity};
+
+  /// \brief Visualization label
+  public: std::optional<std::string> visualizationLabel{std::nullopt};
 };
 
 using namespace gz;
@@ -74,7 +79,8 @@ Link::~Link() = default;
 /////////////////////////////////////////////////
 Link &Link::operator=(const Link &_link)
 {
-  *this->dataPtr = (*_link.dataPtr);
+  this->dataPtr->visualizationLabel = _link.dataPtr->visualizationLabel;
+  this->dataPtr->id = _link.dataPtr->id;
   return *this;
 }
 
@@ -487,4 +493,50 @@ void Link::AddWorldWrench(EntityComponentManager &_ecm,
     msgs::Set(linkWrenchComp->Data().mutable_torque(),
       msgs::Convert(linkWrenchComp->Data().torque()) + torqueWithOffset);
   }
+
+  if (this->dataPtr->visualizationLabel.has_value())
+  {
+    auto pose = this->WorldPose(_ecm);
+    if (!pose.has_value())
+      return;
+    auto visWrenchComp =
+      _ecm.Component<components::WrenchVisual_V>(this->dataPtr->id);
+
+    components::WrenchVisual_V visualV;
+    msgs::WrenchVisual* wrenchVisual;
+    if (!visWrenchComp)
+    {
+      wrenchVisual = visualV.Data().add_data();
+    }
+    else
+    {
+      wrenchVisual = visWrenchComp->Data().mutable_data()->Add();
+    }
+    wrenchVisual->set_label(this->dataPtr->visualizationLabel.value());
+    wrenchVisual->mutable_entity()->set_id(this->Entity());
+    if(this->Name(_ecm).has_value())
+      wrenchVisual->mutable_entity()->set_name(this->Name(_ecm).value());
+    wrenchVisual->mutable_entity()->set_type(msgs::Entity_Type_LINK);
+
+    msgs::Set(wrenchVisual->mutable_pos(), pose.value().Pos());
+    msgs::Set(wrenchVisual->mutable_wrench()->mutable_force(), _force);
+    msgs::Set(wrenchVisual->mutable_wrench()->mutable_torque(), _torque);
+    if (!visWrenchComp)
+    {
+      _ecm.CreateComponent<components::WrenchVisual_V>(
+        this->dataPtr->id, visualV);
+    }
+    ///igndbg << "publishing wrench visual for link ["
+    ///       << this->dataPtr->id << "] with force [" << _force
+    ///       << "] and torque [" << _torque << "]" << "from ["
+    ///       << this->dataPtr->visualizationLabel.value() << "]" << std::endl;
+  }
+}
+
+
+//////////////////////////////////////////////////
+void Link::SetVisualizationLabel(
+  const std::string &_label)
+{
+  this->dataPtr->visualizationLabel = _label;
 }
