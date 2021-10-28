@@ -39,10 +39,17 @@
 
 #include "ignition/gazebo/Link.hh"
 
+#include <gz/msgs/entity_wrench_map.pb.h>
+
+#include "gz/sim/components/EntityWrench.hh"
+
 class ignition::gazebo::LinkPrivate
 {
   /// \brief Id of link entity.
   public: Entity id{kNullEntity};
+
+  /// \brief Visualization label
+  public: std::optional<std::string> visualizationLabel{std::nullopt};
 };
 
 using namespace ignition;
@@ -70,7 +77,8 @@ Link::~Link() = default;
 /////////////////////////////////////////////////
 Link &Link::operator=(const Link &_link)
 {
-  *this->dataPtr = (*_link.dataPtr);
+  this->dataPtr->visualizationLabel = _link.dataPtr->visualizationLabel;
+  this->dataPtr->id = _link.dataPtr->id;
   return *this;
 }
 
@@ -425,5 +433,84 @@ void Link::AddWorldWrench(EntityComponentManager &_ecm,
 
     msgs::Set(linkWrenchComp->Data().mutable_torque(),
               msgs::Convert(linkWrenchComp->Data().torque()) + _torque);
+  }
+
+  if (this->dataPtr->visualizationLabel.has_value())
+  {
+    auto& label = this->dataPtr->visualizationLabel.value();
+
+    // Enable required components.
+    enableComponent<components::WorldPose>(_ecm, this->dataPtr->id, true);
+    enableComponent<components::EntityWrenchMap>(_ecm, this->dataPtr->id, true);
+
+    auto entityWrenchMapComp =
+        _ecm.Component<components::EntityWrenchMap>(this->dataPtr->id);
+    if (!entityWrenchMapComp)
+    {
+      static bool informed{false};
+      if (!informed)
+      {
+        gzerr << "Failed to retrieve EntityWrenchMap component for link ["
+              << this->dataPtr->id << "] from [" << label << "]\n";
+      }
+      return;
+    }
+
+    // Populate data
+    msgs::EntityWrench msg;
+
+    // Set label
+    {
+      auto data = msg.mutable_header()->add_data();
+      data->set_key("label");
+      data->add_value(label);
+    }
+
+    // Set name
+    {
+      auto data = msg.mutable_header()->add_data();
+      data->set_key("name");
+      if (this->Name(_ecm).has_value())
+      {
+        data->add_value(this->Name(_ecm).value());
+      }
+    }
+
+    // Set entity
+    msg.mutable_entity()->set_id(this->Entity());
+
+    // Set wrench
+    msgs::Set(msg.mutable_wrench()->mutable_force(), _force);
+    msgs::Set(msg.mutable_wrench()->mutable_torque(), _torque);
+
+    // Update map with wrench
+    auto& data = entityWrenchMapComp->Data();
+    (*data.mutable_wrenches())[label] = msg;
+
+    _ecm.SetChanged(this->dataPtr->id, components::EntityWrenchMap::typeId,
+        ComponentState::PeriodicChange);
+
+    // {
+    //   gzdbg << "Publishing entity wrench map for link ["
+    //         << this->dataPtr->id << "]\n"
+    //         << "Size: "
+    //         << entityWrenchMapComp->Data().wrenches().size() << "\n"
+    //         << "Label: " << label << "\n"
+    //         << entityWrenchMapComp->Data().DebugString() << "\n";
+    // }
+  }
+}
+
+//////////////////////////////////////////////////
+void Link::SetVisualizationLabel(
+  const std::string &_label)
+{
+  if (_label.empty())
+  {
+    this->dataPtr->visualizationLabel = std::nullopt;
+  }
+  else
+  {
+    this->dataPtr->visualizationLabel = _label;
   }
 }
