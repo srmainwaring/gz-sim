@@ -307,15 +307,6 @@ void ShaderParamPrivate::OnUpdate()
 
     // default to glsl
     auto it = this->shaders.find("glsl");
-    if (it != this->shaders.end())
-    {
-      mat->SetVertexShader(it->second.vertexShaderUri);
-      mat->SetFragmentShader(it->second.fragmentShaderUri);
-    }
-    // prefer metal over glsl on macOS
-    // \todo(anyone) instead of using ifdef to check for macOS,
-    // expose add an accessor function to get the GraphicsApi
-    // from rendering::RenderEngine
 #ifdef __APPLE__
     auto metalIt = this->shaders.find("metal");
     if (metalIt != this->shaders.end())
@@ -327,7 +318,16 @@ void ShaderParamPrivate::OnUpdate()
       if (it != this->shaders.end())
         gzmsg << "Using metal shaders. " << std::endl;
     }
+#else
+    // only load glsl shaders if not macOS
+    if (it != this->shaders.end())
+    {
+      mat->SetVertexShader(it->second.vertexShaderUri);
+      mat->SetFragmentShader(it->second.fragmentShaderUri);
+    }
 #endif
+
+
     this->visual->SetMaterial(mat);
     scene->DestroyMaterial(mat);
     this->material = this->visual->Material();
