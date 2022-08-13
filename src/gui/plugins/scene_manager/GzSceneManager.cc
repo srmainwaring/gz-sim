@@ -36,7 +36,6 @@
 
 #include "gz/sim/EntityComponentManager.hh"
 #include "gz/sim/components/Name.hh"
-#include "gz/sim/components/SystemPluginInfo.hh"
 #include "gz/sim/components/Visual.hh"
 #include "gz/sim/components/World.hh"
 #include "gz/sim/gui/GuiEvents.hh"
@@ -135,54 +134,39 @@ void GzSceneManager::Update(const UpdateInfo &_info,
   this->dataPtr->renderUtil.UpdateFromECM(_info, _ecm);
 
   // load visual plugin on gui side
-  std::map<Entity, sdf::Plugins> plugins;
+  std::map<Entity, sdf::ElementPtr> pluginElems;
   if (!this->dataPtr->initializedVisualPlugins)
   {
-    _ecm.Each<components::Visual, components::SystemPluginInfo>(
+    _ecm.Each<components::Visual, components::VisualPlugin>(
         [&](const Entity &_entity,
             const components::Visual *,
-            const components::SystemPluginInfo *_plugins)->bool
+            const components::VisualPlugin *_plugin)->bool
     {
-      sdf::Plugins convertedPlugins = convert<sdf::Plugins>(_plugins->Data());
-      plugins[_entity].insert(plugins[_entity].end(),
-          convertedPlugins.begin(), convertedPlugins.end());
+      sdf::ElementPtr pluginElem = _plugin->Data();
+      pluginElems[_entity] = _plugin->Data();
       return true;
     });
     this->dataPtr->initializedVisualPlugins = true;
   }
   else
   {
-    _ecm.EachNew<components::Visual, components::SystemPluginInfo>(
+    _ecm.EachNew<components::Visual, components::VisualPlugin>(
         [&](const Entity &_entity,
             const components::Visual *,
-            const components::SystemPluginInfo *_plugins)->bool
+            const components::VisualPlugin *_plugin)->bool
     {
-      sdf::Plugins convertedPlugins = convert<sdf::Plugins>(_plugins->Data());
-      plugins[_entity].insert(plugins[_entity].end(),
-          convertedPlugins.begin(), convertedPlugins.end());
+      sdf::ElementPtr pluginElem = _plugin->Data();
+      pluginElems[_entity] = _plugin->Data();
       return true;
     });
   }
-  for (const auto &it : plugins)
+  for (const auto &it : pluginElems)
   {
-    // Send the new VisualPlugins event
-    gz::sim::gui::events::VisualPlugins visualPluginsEvent(
+    gz::sim::gui::events::VisualPlugin visualPluginEvent(
         it.first, it.second);
     gz::gui::App()->sendEvent(
         gz::gui::App()->findChild<gz::gui::MainWindow *>(),
-        &visualPluginsEvent);
-
-    // Send the old VisualPlugin event
-    for (const sdf::Plugin &plugin : it.second)
-    {
-      GZ_UTILS_WARN_IGNORE__DEPRECATED_DECLARATION
-      gz::sim::gui::events::VisualPlugin visualPluginEvent(
-          it.first, plugin.ToElement());
-      GZ_UTILS_WARN_RESUME__DEPRECATED_DECLARATION
-      gz::gui::App()->sendEvent(
-          gz::gui::App()->findChild<gz::gui::MainWindow *>(),
-          &visualPluginEvent);
-    }
+        &visualPluginEvent);
   }
 
   // Emit entities created / removed event for gui::Plugins which don't have
