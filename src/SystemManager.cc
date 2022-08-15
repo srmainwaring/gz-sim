@@ -24,8 +24,31 @@
 #include "gz/sim/Conversions.hh"
 #include "SystemManager.hh"
 
+#include "gz/sim/components/Visual.hh"
+#include "gz/sim/components/SystemPluginInfo.hh"
+
 using namespace gz;
 using namespace sim;
+
+//////////////////////////////////////////////////
+/// \note debug info
+namespace {
+void CountVisualPlugins(EntityComponentManager &_ecm)
+{
+  uint32_t pluginCount = 0;
+  _ecm.Each<components::Visual, components::SystemPluginInfo>(
+      [&](const Entity &_entity,
+          const components::Visual *,
+          const components::SystemPluginInfo *_plugins)->bool
+  {
+    sdf::Plugins convertedPlugins = convert<sdf::Plugins>(_plugins->Data());
+    pluginCount += convertedPlugins.size();
+    gzdbg << "Entity: " << _entity
+        << ", Plugin count: " << pluginCount << "\n";
+    return true;
+  });
+}
+}
 
 //////////////////////////////////////////////////
 SystemManager::SystemManager(
@@ -62,6 +85,9 @@ void SystemManager::LoadPlugin(const Entity _entity,
     std::lock_guard<std::mutex> lock(this->systemLoaderMutex);
     system = this->systemLoader->LoadPlugin(_plugin);
   }
+  
+  /// \note debug
+  CountVisualPlugins(*this->entityCompMgr);
 
   // System correctly loaded from library
   if (system)
@@ -71,6 +97,7 @@ void SystemManager::LoadPlugin(const Entity _entity,
     ss.name = _plugin.Name();
     ss.configureSdf = _plugin.ToElement();
     this->AddSystemImpl(ss, ss.configureSdf);
+
     gzdbg << "Loaded system [" << _plugin.Name()
            << "] for entity [" << _entity << "]" << std::endl;
   }

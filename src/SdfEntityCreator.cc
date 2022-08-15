@@ -118,6 +118,26 @@ class gz::sim::SdfEntityCreatorPrivate
 using namespace gz;
 using namespace sim;
 
+//////////////////////////////////////////////////
+/// \note debug info
+namespace {
+void CountVisualPlugins(EntityComponentManager &_ecm)
+{
+  uint32_t pluginCount = 0;
+  _ecm.Each<components::Visual, components::SystemPluginInfo>(
+      [&](const Entity &_entity,
+          const components::Visual *,
+          const components::SystemPluginInfo *_plugins)->bool
+  {
+    sdf::Plugins convertedPlugins = convert<sdf::Plugins>(_plugins->Data());
+    pluginCount += convertedPlugins.size();
+    gzdbg << "Entity: " << _entity
+        << ", Plugin count: " << pluginCount << "\n";
+    return true;
+  });
+}
+}
+
 /////////////////////////////////////////////////
 /// \brief Resolve the pose of an SDF DOM object with respect to its relative_to
 /// frame. If that fails, return the raw pose
@@ -360,6 +380,9 @@ Entity SdfEntityCreator::CreateEntities(const sdf::Model *_model)
 
   auto ent = this->CreateEntities(_model, false);
 
+  /// \note debug
+  CountVisualPlugins(*this->dataPtr->ecm);
+
   // Load all model plugins afterwards, so we get scoped name for nested models.
   for (const auto &[entity, plugins] : this->dataPtr->newModels)
   {
@@ -373,6 +396,9 @@ Entity SdfEntityCreator::CreateEntities(const sdf::Model *_model)
     }
   }
   this->dataPtr->newModels.clear();
+
+  /// \note debug
+  CountVisualPlugins(*this->dataPtr->ecm);
 
   // Load sensor plugins after model, so we get scoped name.
   for (const auto &[entity, plugins] : this->dataPtr->newSensors)
@@ -388,6 +414,9 @@ Entity SdfEntityCreator::CreateEntities(const sdf::Model *_model)
   }
   this->dataPtr->newSensors.clear();
 
+  /// \note debug
+  CountVisualPlugins(*this->dataPtr->ecm);
+
   // Load visual plugins after model, so we get scoped name.
   for (const auto &[entity, plugins] : this->dataPtr->newVisuals)
   {
@@ -401,6 +430,9 @@ Entity SdfEntityCreator::CreateEntities(const sdf::Model *_model)
     }
   }
   this->dataPtr->newVisuals.clear();
+
+  /// \note debug
+  CountVisualPlugins(*this->dataPtr->ecm);
 
   return ent;
 }
