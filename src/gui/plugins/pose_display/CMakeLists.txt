@@ -1,0 +1,10 @@
+gz_add_gui_plugin(PoseDisplay
+  SOURCES
+    PoseDisplay.cc
+  QT_HEADERS
+    PoseDisplay.hh
+  TEST_SOURCES
+    PoseDisplay_TEST.cc
+  PRIVATE_LINK_LIBS
+    gz-rendering${GZ_RENDERING_VER}::core
+)
