@@ -1,0 +1,5 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="PoseDisplay/">
+  <file>PoseDisplay.qml</file>
+</qresource>
+</RCC>
