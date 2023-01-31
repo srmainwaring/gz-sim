@@ -230,15 +230,16 @@
 
       <!-- Add link to the end of the pendulum to capture it's pose -->
       <link name="end_link">
-        <pose relative_to="end_joint">0 0 0.95 0 0 0</pose>
+        <!-- <pose relative_to="end_joint">0 0 0.95 0 0 0</pose> -->
+        <pose relative_to="end_joint">0 0 0.25 0 0 0</pose>
         <inertial>
           <pose>0 0 0 0 0 0</pose>
-          <mass>0.1</mass>
+          <mass>0.5</mass>
           <inertia>
-            <ixx>0.001</ixx>
+            <ixx>0.01</ixx>
             <ixy>0.0</ixy>
             <ixz>0.0</ixz>
-            <iyy>0.001</iyy>
+            <iyy>0.01</iyy>
             <iyz>0.0</iyz>
             <izz>0.001</izz>
           </inertia>
@@ -257,20 +258,37 @@
         </visual>
       </link>
       <joint name="end_joint" type="revolute">
-        <pose relative_to="double_pendulum::lower_link">0 0 0 0 0 0</pose>
+        <pose relative_to="double_pendulum::lower_link">0 0 1.0 0 0 0</pose>
         <parent>double_pendulum::lower_link</parent>
         <child>end_link</child>
         <axis>
-          <xyz>0 0 1</xyz>
+          <xyz>1 0 0</xyz>
           <limit>
-            <lower>0</lower>
-            <upper>0</upper>
+            <lower>-1e+16</lower>
+            <upper>1e+16</upper>
           </limit>
           <dynamics>
-            <damping>1</damping>
+            <damping>0</damping>
           </dynamics>
         </axis>
       </joint>
+
+      <!-- <plugin filename="gz-sim-odometry-publisher-system"
+          name="gz::sim::systems::OdometryPublisher">
+        <odom_frame>odom</odom_frame>
+        <robot_base_frame>base_link</robot_base_frame>
+        <odom_publish_frequency>50</odom_publish_frequency>
+        <odom_topic>model/rm3_wec/odometry</odom_topic>
+        <dimensions>3</dimensions>
+      </plugin> -->
+      <plugin filename="gz-sim-pose-publisher-system"
+          name="gz::sim::systems::PosePublisher">
+        <publish_link_pose>true</publish_link_pose>
+        <use_pose_vector_msg>true</use_pose_vector_msg>
+        <static_publisher>true</static_publisher>
+        <static_update_frequency>1</static_update_frequency>
+      </plugin>
+
     </model>
 
   </world>

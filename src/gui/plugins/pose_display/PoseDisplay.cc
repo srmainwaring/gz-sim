@@ -244,6 +244,7 @@ void PoseDisplayPrivate::PerformRenderingOperations()
     {
       if (this->arrowVisuals[i] != nullptr)
       {
+        // update material
         rendering::MaterialPtr mat = this->scene->CreateMaterial();    
         mat->SetAmbient(this->color);
         mat->SetDiffuse(this->color);
@@ -254,10 +255,35 @@ void PoseDisplayPrivate::PerformRenderingOperations()
         this->arrowVisuals[i]->SetMaterial(mat);
         this->scene->DestroyMaterial(mat);
 
+        // update dimensions
+        this->arrowVisuals[i]->Shaft()->SetLocalScale(
+          this->shaftRadius * 2.0,
+          this->shaftRadius * 2.0,
+          this->shaftLength);
+        this->arrowVisuals[i]->Shaft()->SetOrigin(
+          0.0,
+          0.0,
+          this->shaftLength * -1.0);
+        this->arrowVisuals[i]->Head()->SetLocalScale(
+          this->headRadius * 2.0,
+          this->headRadius * 2.0,
+          this->headLength * 2.0);
+
         this->arrowVisuals[i]->SetVisible(this->shapeIndex == 0);
       }
+
       if (this->axisVisuals[i] != nullptr)
       {
+        // update dimensions
+        for (int j = 0; j < 3; ++j)
+        {
+          auto visual = this->axisVisuals[i]->ChildByIndex(j);
+          visual->SetLocalScale(
+            this->axesRadius * 20.0,
+            this->axesRadius * 20.0,
+            this->axesLength * 2.0);
+        }
+
         this->axisVisuals[i]->SetVisible(this->shapeIndex == 1);
       }
     }
