@@ -253,7 +253,7 @@ Rectangle {
       visible: shape.currentIndex === 0
       Layout.columnSpan: 2
       Layout.fillWidth: true
-      placeholderText: "1.0"
+      placeholderText: "0.5"
       text: PoseDisplay.shaftLength.toFixed(1)
       validator: DoubleValidator {
         bottom: 0.0
@@ -307,12 +307,12 @@ Rectangle {
       visible: shape.currentIndex === 0
       Layout.columnSpan: 2
       Layout.fillWidth: true
-      placeholderText: "0.3"
+      placeholderText: "0.25"
       text: PoseDisplay.headLength.toFixed(1)
       validator: DoubleValidator {
         bottom: 0.0
         top: 3.0
-        decimals: 1
+        decimals: 2
       }
       onAccepted: {
         PoseDisplay.SetHeadLength(headLength.text)
