@@ -134,9 +134,9 @@ class PoseDisplayPrivate
 
   public: int shapeIndex{0};
   public: math::Color color{math::Color::Red};
-  public: double shaftLength{1.0};
+  public: double shaftLength{0.5};
   public: double shaftRadius{0.05};
-  public: double headLength{0.3};
+  public: double headLength{0.25};
   public: double headRadius{0.1};
   public: double axesLength{1.0};
   public: double axesRadius{0.1};
@@ -191,10 +191,48 @@ void PoseDisplayPrivate::PerformRenderingOperations()
     this->filterSizeDirty = false;
   }
 
-  int i = this->poseIndex;
+  int idx = this->poseIndex;
+
+  auto updateArrow = [this](rendering::ArrowVisualPtr _visual)
+  {
+    // update material
+    rendering::MaterialPtr mat = this->scene->CreateMaterial();
+    mat->SetAmbient(this->color);
+    mat->SetDiffuse(this->color);
+    mat->SetSpecular(0.5, 0.5, 0.5, this->color.A());
+    mat->SetShininess(50);
+    mat->SetReflectivity(0);
+    mat->SetCastShadows(false);
+    _visual->SetMaterial(mat);
+    this->scene->DestroyMaterial(mat);
+
+    // update dimensions
+    _visual->Shaft()->SetOrigin(0.0, 0.0, 0.5);
+    _visual->Shaft()->SetLocalScale(
+      this->shaftRadius, this->shaftRadius, this->shaftLength);
+
+    _visual->Head()->SetOrigin(0.0, 0.0, -0.5);
+    _visual->Head()->SetLocalScale(
+      this->headRadius, this->headRadius, this->headLength);
+
+    _visual->SetVisible(this->shapeIndex == 0);
+  };
+
+  auto updateAxes = [this](rendering::AxisVisualPtr _visual)
+  {
+    // update dimensions
+    for (int i = 0; i < 3; ++i)
+    {
+      auto arrow = _visual->ChildByIndex(i);
+      arrow->SetLocalScale(
+        this->axesRadius * 20,
+        this->axesRadius * 20,
+        this->axesLength * 2);
+    }
+  };
 
   // Create arrow visuals
-  if (this->arrowVisuals[i] == nullptr)
+  if (this->arrowVisuals[idx] == nullptr)
   {
     rendering::MaterialPtr mat = this->scene->CreateMaterial();    
     mat->SetAmbient(this->color);
@@ -205,96 +243,67 @@ void PoseDisplayPrivate::PerformRenderingOperations()
     mat->SetCastShadows(false);
 
     auto visual = this->scene->CreateArrowVisual();
-    visual->SetMaterial(mat);
-    this->scene->DestroyMaterial(mat);
+    updateArrow(visual);
 
-    visual->SetLocalScale(0.5, 0.5, 0.5);
     visual->ShowArrowHead(true);
     visual->ShowArrowShaft(true);
     visual->ShowArrowRotation(false);
     visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
     visual->SetVisible(this->shapeIndex == 0);
 
-    this->arrowVisuals[i] = visual;
-    rootVisual->AddChild(this->arrowVisuals[i]);
+    this->arrowVisuals[idx] = visual;
+    rootVisual->AddChild(this->arrowVisuals[idx]);
 
-    // gzdbg << "Add Arrow[" << i << "], Id["
+    // gzdbg << "Add Arrow[" << idx << "], Id["
     //       << visual->Id() << "]\n";
   }
 
   // Create axis visuals
-  if (this->axisVisuals[i] == nullptr)
+  if (this->axisVisuals[idx] == nullptr)
   {
     auto visual = this->scene->CreateAxisVisual();
+    updateAxes(visual);
+
     visual->ShowAxisHead(false);
     visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
     visual->SetVisible(this->shapeIndex == 1);
 
-    this->axisVisuals[i] = visual;
-    rootVisual->AddChild(this->axisVisuals[i]);
+    this->axisVisuals[idx] = visual;
+    rootVisual->AddChild(this->axisVisuals[idx]);
 
-    // gzdbg << "Add Axis[" << i << "], Id["
+    // gzdbg << "Add Axis[" << idx << "], Id["
     //       << visual->Id() << "]\n";
   }
 
   // switch shape
   if (this->shapeDirty)
   {
-    for (auto i = 0; i < this->filterSize; ++i)
+    for (auto&& visual : this->arrowVisuals)
     {
-      if (this->arrowVisuals[i] != nullptr)
+      if (visual != nullptr)
       {
-        // update material
-        rendering::MaterialPtr mat = this->scene->CreateMaterial();    
-        mat->SetAmbient(this->color);
-        mat->SetDiffuse(this->color);
-        mat->SetSpecular(0.5, 0.5, 0.5, this->color.A());
-        mat->SetShininess(50);
-        mat->SetReflectivity(0);
-        mat->SetCastShadows(false);
-        this->arrowVisuals[i]->SetMaterial(mat);
-        this->scene->DestroyMaterial(mat);
-
-        // update dimensions
-        this->arrowVisuals[i]->Shaft()->SetLocalScale(
-          this->shaftRadius * 2.0,
-          this->shaftRadius * 2.0,
-          this->shaftLength);
-        this->arrowVisuals[i]->Shaft()->SetOrigin(
-          0.0,
-          0.0,
-          this->shaftLength * -1.0);
-        this->arrowVisuals[i]->Head()->SetLocalScale(
-          this->headRadius * 2.0,
-          this->headRadius * 2.0,
-          this->headLength * 2.0);
-
-        this->arrowVisuals[i]->SetVisible(this->shapeIndex == 0);
-      }
-
-      if (this->axisVisuals[i] != nullptr)
-      {
-        // update dimensions
-        for (int j = 0; j < 3; ++j)
-        {
-          auto visual = this->axisVisuals[i]->ChildByIndex(j);
-          visual->SetLocalScale(
-            this->axesRadius * 20.0,
-            this->axesRadius * 20.0,
-            this->axesLength * 2.0);
-        }
-
-        this->axisVisuals[i]->SetVisible(this->shapeIndex == 1);
+        updateArrow(visual);
+        visual->SetVisible(this->shapeIndex == 0);
       }
     }
+
+    for (auto&& visual : this->axisVisuals)
+    {
+      if (visual != nullptr)
+      {
+        updateAxes(visual);
+        visual->SetVisible(this->shapeIndex == 1);
+      }
+    }
+
     this->shapeDirty = false;
   }
 
   // Set pose
   math::Pose3d pose = msgs::Convert(this->poseMsg);
-  this->arrowVisuals[i]->SetWorldPose(
+  this->arrowVisuals[idx]->SetWorldPose(
       pose * math::Pose3d(0, 0, 0, 0, GZ_PI/2, 0));
-  this->axisVisuals[i]->SetWorldPose(pose);
+  this->axisVisuals[idx]->SetWorldPose(pose);
 
   // gzdbg << "Render:\n"
   //       << " Node count [" << this->scene->NodeCount() << "].\n"

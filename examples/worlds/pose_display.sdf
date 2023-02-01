@@ -153,15 +153,15 @@
         <filter_size>10</filter_size>
         <shape>Arrow</shape>
         <color>0.0 1.0 0.0 0.9</color>
-        <shaft_length>1.0</shaft_length>
+        <shaft_length>0.5</shaft_length>
         <shaft_radius>0.05</shaft_radius>
-        <head_length>0.3</head_length>
+        <head_length>0.25</head_length>
         <head_radius>0.1</head_radius>
-        <axes_length>1.0</axes_length>
-        <axes_radius>0.1</axes_radius>
+        <axes_length>0.5</axes_length>
+        <axes_radius>0.05</axes_radius>
       </plugin>
 
-      <plugin filename="PoseDisplay" name="Pose Display">
+      <!-- <plugin filename="PoseDisplay" name="Pose Display">
         <gz-gui>
           <title>Pose Display</title>
         </gz-gui>
@@ -170,7 +170,7 @@
         <filter_size>10</filter_size>
         <shape>Arrow</shape>
         <color>1.0 0.0 1.0 0.9</color>
-      </plugin>
+      </plugin> -->
 
     </gui>
 
@@ -223,6 +223,7 @@
     </model>
 
     <model name="pendulum">
+      <pose>1 1 0 0 0 0</pose>
       <include>
         <name>double_pendulum</name>
         <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Double pendulum with base</uri>
@@ -230,7 +231,6 @@
 
       <!-- Add link to the end of the pendulum to capture it's pose -->
       <link name="end_link">
-        <!-- <pose relative_to="end_joint">0 0 0.95 0 0 0</pose> -->
         <pose relative_to="end_joint">0 0 0.25 0 0 0</pose>
         <inertial>
           <pose>0 0 0 0 0 0</pose>
@@ -273,20 +273,18 @@
         </axis>
       </joint>
 
-      <!-- <plugin filename="gz-sim-odometry-publisher-system"
-          name="gz::sim::systems::OdometryPublisher">
-        <odom_frame>odom</odom_frame>
-        <robot_base_frame>base_link</robot_base_frame>
-        <odom_publish_frequency>50</odom_publish_frequency>
-        <odom_topic>model/rm3_wec/odometry</odom_topic>
-        <dimensions>3</dimensions>
-      </plugin> -->
       <plugin filename="gz-sim-pose-publisher-system"
           name="gz::sim::systems::PosePublisher">
         <publish_link_pose>true</publish_link_pose>
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-        <static_publisher>true</static_publisher>
-        <static_update_frequency>1</static_update_frequency>
+        <!-- <publish_visual_pose>true</publish_visual_pose> -->
+        <!-- <publish_collision_pose>true</publish_collision_pose> -->
+        <!-- <publish_sensor_pose>true</publish_sensor_pose> -->
+        <publish_model_pose>true</publish_model_pose>
+        <publish_nested_model_pose>true</publish_nested_model_pose>
+        <!-- <use_pose_vector_msg>true</use_pose_vector_msg> -->
+        <update_frequency>10</update_frequency>
+        <!-- <static_publisher>true</static_publisher> -->
+        <!-- <static_update_frequency>1</static_update_frequency> -->
       </plugin>
 
     </model>
