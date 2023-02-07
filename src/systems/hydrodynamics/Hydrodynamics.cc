@@ -15,6 +15,7 @@
  *
  */
 #include <string>
+#include <chrono>
 
 #include <Eigen/Eigen>
 
@@ -95,6 +96,12 @@ class gz::sim::systems::HydrodynamicsPrivateData
 
   /// \brief Link entity
   public: Entity linkEntity;
+
+  // debug info
+  public: std::chrono::steady_clock::duration updatePeriod{
+      std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::microseconds{100})};
+  public: std::chrono::steady_clock::duration lastUpdateTime{0};
 
   /// \brief Ocean current callback
   public: void UpdateCurrent(const msgs::Vector3d &_msg);
@@ -578,6 +585,18 @@ void Hydrodynamics::PreUpdate(
     _ecm,
     pose->Rot()*(totalForce),
     pose->Rot()*totalTorque);
+
+  // debug info
+#if 0
+  if (_info.simTime - this->dataPtr->lastUpdateTime >
+      this->dataPtr->updatePeriod)
+  {
+    this->dataPtr->lastUpdateTime = _info.simTime;
+    gzdbg << "\nX:\n" << state
+          << "\nF:\n" << kTotalWrench
+          << "\n";
+  }
+#endif
 }
 
 /////////////////////////////////////////////////
