@@ -1,0 +1,10 @@
+gz_add_gui_plugin(ForceDisplay
+  SOURCES
+    ForceDisplay.cc
+  QT_HEADERS
+    ForceDisplay.hh
+  TEST_SOURCES
+    ForceDisplay_TEST.cc
+  PRIVATE_LINK_LIBS
+    gz-rendering${GZ_RENDERING_VER}::core
+)
