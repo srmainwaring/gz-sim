@@ -20,8 +20,7 @@
 #include <gz/math/Vector3.hh>
 
 #include <gz/msgs/Utility.hh>
-#include <gz/msgs/marker.pb.h>
-#include <gz/msgs/wrench_visual.pb.h>
+#include <gz/msgs/entity_wrench_map.pb.h>
 
 #include "gz/sim/components/AngularAcceleration.hh"
 #include "gz/sim/components/AngularVelocity.hh"
@@ -29,6 +28,7 @@
 #include "gz/sim/components/AxisAlignedBox.hh"
 #include "gz/sim/components/CanonicalLink.hh"
 #include "gz/sim/components/Collision.hh"
+#include "gz/sim/components/EntityWrench.hh"
 #include "gz/sim/components/ExternalWorldWrenchCmd.hh"
 #include "gz/sim/components/Inertial.hh"
 #include "gz/sim/components/Joint.hh"
@@ -543,49 +543,82 @@ void Link::AddWorldWrench(EntityComponentManager &_ecm,
 
   if (this->dataPtr->visualizationLabel.has_value())
   {
-    auto pose = this->WorldPose(_ecm);
-    if (!pose.has_value())
+    auto& label = this->dataPtr->visualizationLabel.value();
+
+    // Enable required components.
+    enableComponent<components::WorldPose>(_ecm, this->dataPtr->id, true);
+    enableComponent<components::EntityWrenchMap>(_ecm, this->dataPtr->id, true);
+
+    auto entityWrenchMapComp =
+        _ecm.Component<components::EntityWrenchMap>(this->dataPtr->id);
+    if (!entityWrenchMapComp)
+    {
+      static bool informed{false};
+      if (!informed)
+      {
+        gzerr << "Failed to retrieve EntityWrenchMap component for link ["
+              << this->dataPtr->id << "] from [" << label << "]\n";
+      }
       return;
-    auto visWrenchComp =
-      _ecm.Component<components::WrenchVisual_V>(this->dataPtr->id);
+    }
 
-    components::WrenchVisual_V visualV;
-    msgs::WrenchVisual* wrenchVisual;
-    if (!visWrenchComp)
-    {
-      wrenchVisual = visualV.Data().add_data();
-    }
-    else
-    {
-      wrenchVisual = visWrenchComp->Data().mutable_data()->Add();
-    }
-    wrenchVisual->set_label(this->dataPtr->visualizationLabel.value());
-    wrenchVisual->mutable_entity()->set_id(this->Entity());
-    if(this->Name(_ecm).has_value())
-      wrenchVisual->mutable_entity()->set_name(this->Name(_ecm).value());
-    wrenchVisual->mutable_entity()->set_type(msgs::Entity_Type_LINK);
+    // Populate data
+    msgs::EntityWrench msg;
 
-    msgs::Set(wrenchVisual->mutable_pos(), pose.value().Pos());
-    msgs::Set(wrenchVisual->mutable_wrench()->mutable_force(), _force);
-    msgs::Set(wrenchVisual->mutable_wrench()->mutable_torque(), _torque);
-    if (!visWrenchComp)
+    // Set label
     {
-      _ecm.CreateComponent<components::WrenchVisual_V>(
-        this->dataPtr->id, visualV);
+      auto data = msg.mutable_header()->add_data();
+      data->set_key("label");
+      data->add_value(label);
     }
-    ///igndbg << "publishing wrench visual for link ["
-    ///       << this->dataPtr->id << "] with force [" << _force
-    ///       << "] and torque [" << _torque << "]" << "from ["
-    ///       << this->dataPtr->visualizationLabel.value() << "]" << std::endl;
+
+    // Set name
+    {
+      auto data = msg.mutable_header()->add_data();
+      data->set_key("name");
+      if (this->Name(_ecm).has_value())
+      {
+        data->add_value(this->Name(_ecm).value());
+      }
+    }
+
+    // Set entity
+    msg.mutable_entity()->set_id(this->Entity());
+
+    // Set wrench
+    msgs::Set(msg.mutable_wrench()->mutable_force(), _force);
+    msgs::Set(msg.mutable_wrench()->mutable_torque(), _torque);
+
+    // Update map with wrench
+    auto& data = entityWrenchMapComp->Data();
+    (*data.mutable_wrenches())[label] = msg;
+
+    _ecm.SetChanged(this->dataPtr->id, components::EntityWrenchMap::typeId,
+        ComponentState::PeriodicChange);
+
+    // {
+    //   gzdbg << "Publishing entity wrench map for link ["
+    //         << this->dataPtr->id << "]\n"
+    //         << "Size: "
+    //         << entityWrenchMapComp->Data().wrenches().size() << "\n"
+    //         << "Label: " << label << "\n"
+    //         << entityWrenchMapComp->Data().DebugString() << "\n";
+    // }
   }
 }
-
 
 //////////////////////////////////////////////////
 void Link::SetVisualizationLabel(
   const std::string &_label)
 {
-  this->dataPtr->visualizationLabel = _label;
+  if (_label.empty())
+  {
+    this->dataPtr->visualizationLabel = std::nullopt;
+  }
+  else
+  {
+    this->dataPtr->visualizationLabel = _label;
+  }
 }
 
 //////////////////////////////////////////////////
