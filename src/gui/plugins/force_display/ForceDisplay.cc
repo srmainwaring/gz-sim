@@ -132,14 +132,14 @@ class ForceDisplayPrivate
   // Properties
   public: bool shapeDirty{true};
 
-  public: int shapeIndex{0};
+  public: bool showForces{true};
   public: math::Color color{math::Color::Red};
   public: double shaftLength{0.5};
   public: double shaftRadius{0.05};
   public: double headLength{0.25};
   public: double headRadius{0.1};
-  public: double axesLength{1.0};
-  public: double axesRadius{0.1};
+
+
 
   // Render operations
   public: rendering::ScenePtr scene;
@@ -147,7 +147,6 @@ class ForceDisplayPrivate
 
   // Store wrench history - filter size
   public: std::vector<rendering::ArrowVisualPtr> arrowVisuals;
-  public: std::vector<rendering::AxisVisualPtr> axisVisuals;
 
   // Pose index modulo filter size
   public: int wrenchIndex{0};
@@ -186,7 +185,6 @@ void ForceDisplayPrivate::PerformRenderingOperations()
   {
     this->ClearDisplay();
     this->arrowVisuals.resize(this->filterSize);
-    this->axisVisuals.resize(this->filterSize);
     this->wrenchIndex = 0;
     this->filterSizeDirty = false;
   }
@@ -215,20 +213,7 @@ void ForceDisplayPrivate::PerformRenderingOperations()
     _visual->Head()->SetLocalScale(
       this->headRadius, this->headRadius, this->headLength);
 
-    _visual->SetVisible(this->shapeIndex == 0);
-  };
-
-  auto updateAxes = [this](rendering::AxisVisualPtr _visual)
-  {
-    // update dimensions
-    for (int i = 0; i < 3; ++i)
-    {
-      auto arrow = _visual->ChildByIndex(i);
-      arrow->SetLocalScale(
-        this->axesRadius * 20,
-        this->axesRadius * 20,
-        this->axesLength * 2);
-    }
+    _visual->SetVisible(this->showForces);
   };
 
   // Create arrow visuals
@@ -249,29 +234,12 @@ void ForceDisplayPrivate::PerformRenderingOperations()
     visual->ShowArrowShaft(true);
     visual->ShowArrowRotation(false);
     visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
-    visual->SetVisible(this->shapeIndex == 0);
+    visual->SetVisible(this->showForces);
 
     this->arrowVisuals[idx] = visual;
     rootVisual->AddChild(this->arrowVisuals[idx]);
 
     // gzdbg << "Add Arrow[" << idx << "], Id["
-    //       << visual->Id() << "]\n";
-  }
-
-  // Create axis visuals
-  if (this->axisVisuals[idx] == nullptr)
-  {
-    auto visual = this->scene->CreateAxisVisual();
-    updateAxes(visual);
-
-    visual->ShowAxisHead(false);
-    visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
-    visual->SetVisible(this->shapeIndex == 1);
-
-    this->axisVisuals[idx] = visual;
-    rootVisual->AddChild(this->axisVisuals[idx]);
-
-    // gzdbg << "Add Axis[" << idx << "], Id["
     //       << visual->Id() << "]\n";
   }
 
@@ -283,16 +251,7 @@ void ForceDisplayPrivate::PerformRenderingOperations()
       if (visual != nullptr)
       {
         updateArrow(visual);
-        visual->SetVisible(this->shapeIndex == 0);
-      }
-    }
-
-    for (auto&& visual : this->axisVisuals)
-    {
-      if (visual != nullptr)
-      {
-        updateAxes(visual);
-        visual->SetVisible(this->shapeIndex == 1);
+        visual->SetVisible(this->showForces);
       }
     }
 
@@ -303,7 +262,6 @@ void ForceDisplayPrivate::PerformRenderingOperations()
   math::Pose3d pose = msgs::Convert(this->poseMsg);
   this->arrowVisuals[idx]->SetWorldPose(
       pose * math::Pose3d(0, 0, 0, 0, GZ_PI/2, 0));
-  this->axisVisuals[idx]->SetWorldPose(pose);
 
   // gzdbg << "Render:\n"
   //       << " Node count [" << this->scene->NodeCount() << "].\n"
@@ -375,10 +333,7 @@ void ForceDisplayPrivate::ClearDisplay()
   //       << "].\n"
   //       << "Removing ["
   //       << this->arrowVisuals.size()
-  //       << "] arrows.\n"
-  //       << "Removing ["
-  //       << this->axisVisualsVisuals.size()
-  //       << "] axis.\n";
+  //       << "] arrows.\n";
 
   // gzdbg << "Before Clear\n"
   //       << "Node count [" << this->scene->NodeCount() << "].\n"
@@ -398,40 +353,10 @@ void ForceDisplayPrivate::ClearDisplay()
   }
   this->arrowVisuals.clear();
 
-  i = 0;
-  for (auto&& visual : this->axisVisuals)
-  {
-    if (visual != nullptr && visual->HasParent())
-    {
-      // gzdbg << "Removing Axis[" << i++ << "], Id["
-      //       << visual->Id() << "] \n";
-      visual->Parent()->RemoveChild(visual);
-      this->scene->DestroyVisual(visual, true);
-      visual.reset();
-    }
-  }
-  this->axisVisuals.clear();
-
   // gzdbg << "After Clear\n"
   //       << "Node count [" << this->scene->NodeCount() << "].\n"
   //       << "Visual count [" << this->scene->VisualCount() << "].\n";
 }
-
-/////////////////////////////////////////////////
-/// \todo requires recursive mutex
-// void ForceDisplayPrivate::Subscribe()
-// {
-//   std::lock_guard<std::mutex> lock(this->mutex);
-//   this->dataPtr->node.Subscribe(newTopic,
-//       &ForceDisplayPrivate::OnPose, this->dataPtr.get());
-// }
-
-/////////////////////////////////////////////////
-// void ForceDisplayPrivate::Unsubscribe()
-// {
-//   std::lock_guard<std::mutex> lock(this->mutex);
-//   this->dataPtr->node.Unsubscribe(this->dataPtr->topic);
-// }
 
 /////////////////////////////////////////////////
 void ForceDisplayPrivate::OnPose(const msgs::Pose &_msg)
@@ -486,26 +411,6 @@ void ForceDisplay::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
     }
 
     {
-      auto elem = _pluginElem->FirstChildElement("shape");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        std::string shape = elem->GetText();
-        std::transform(shape.begin(), shape.end(), shape.begin(), ::toupper);
-        int shapeIndex = this->dataPtr->shapeIndex;
-        if (shape == "ARROW")
-          shapeIndex = 0;
-        else if (shape == "AXIS")
-          shapeIndex = 1;
-        else
-        {
-          gzwarn << "Invalid shape [" << shape << "]. "
-                 << "Must be 'ARROW' or 'AXIS'.\n";
-        }
-        this->SetShapeIndex(0);
-      }
-    }
-
-    {
       auto elem = _pluginElem->FirstChildElement("color");
       if (nullptr != elem && nullptr != elem->GetText())
       {
@@ -513,66 +418,6 @@ void ForceDisplay::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
         math::Color color;
         ss >> color; 
         this->SetColor(gz::gui::convert(color));
-      }
-    }
-
-    {
-      auto elem = _pluginElem->FirstChildElement("shaft_length");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        double shaftLength{0.0};
-        elem->QueryDoubleText(&shaftLength);
-        this->SetShaftLength(shaftLength);
-      }
-    }
-
-    {
-      auto elem = _pluginElem->FirstChildElement("shaft_radius");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        double shaftRadius{0.0};
-        elem->QueryDoubleText(&shaftRadius);
-        this->SetShaftRadius(shaftRadius);
-      }
-    }
-
-    {
-      auto elem = _pluginElem->FirstChildElement("head_length");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        double headLength{0.0};
-        elem->QueryDoubleText(&headLength);
-        this->SetHeadLength(headLength);
-      }
-    }
-
-    {
-      auto elem = _pluginElem->FirstChildElement("head_radius");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        double headRadius{0.0};
-        elem->QueryDoubleText(&headRadius);
-        this->SetHeadRadius(headRadius);
-      }
-    }
-
-    {
-      auto elem = _pluginElem->FirstChildElement("axes_length");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        double axesLength{0.0};
-        elem->QueryDoubleText(&axesLength);
-        this->SetAxesLength(axesLength);
-      }
-    }
-
-    {
-      auto elem = _pluginElem->FirstChildElement("axes_radius");
-      if (nullptr != elem && nullptr != elem->GetText())
-      {
-        double axisRadius{0.0};
-        elem->QueryDoubleText(&axisRadius);
-        this->SetAxesRadius(axisRadius);
       }
     }
   }
@@ -660,46 +505,6 @@ void ForceDisplay::SetUpdateRate(double _updateRate)
 }
 
 /////////////////////////////////////////////////
-int ForceDisplay::FilterSize() const
-{
-  gzdbg << "FilterSize: " << this->dataPtr->filterSize << "\n";
-
-  return this->dataPtr->filterSize;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetFilterSize(int _filterSize)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->filterSize = _filterSize;
-  this->dataPtr->filterSizeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->FilterSizeChanged();
-
-  gzdbg << "SetFilterSize: " << this->dataPtr->filterSize << "\n";
-}
-
-/////////////////////////////////////////////////
-int ForceDisplay::ShapeIndex() const
-{
-  gzdbg << "ShapeIndex: " << this->dataPtr->shapeIndex << "\n";
-
-  return this->dataPtr->shapeIndex;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetShapeIndex(int _shapeIndex)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->shapeIndex = _shapeIndex;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->ShapeIndexChanged();
-
-  gzdbg << "SetShapeIndex: " << this->dataPtr->shapeIndex << "\n";
-}
-
-/////////////////////////////////////////////////
 QColor ForceDisplay::Color() const
 {
   gzdbg << "Color: " << this->dataPtr->color << "\n";
@@ -738,126 +543,6 @@ void ForceDisplay::SetAlpha(double _alpha)
   this->AlphaChanged();
 
   gzdbg << "Alpha: " << this->dataPtr->color.A() << "\n";
-}
-
-/////////////////////////////////////////////////
-double ForceDisplay::ShaftLength() const
-{
-  gzdbg << "ShaftLength: " << this->dataPtr->shaftLength << "\n";
-
-  return this->dataPtr->shaftLength;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetShaftLength(double _shaftLength)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->shaftLength = _shaftLength;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->ShaftLengthChanged();
-
-  gzdbg << "ShaftLength: " << this->dataPtr->shaftLength << "\n";
-}
-
-/////////////////////////////////////////////////
-double ForceDisplay::ShaftRadius() const
-{
-  gzdbg << "ShaftRadius: " << this->dataPtr->shaftRadius << "\n";
-
-  return this->dataPtr->shaftRadius;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetShaftRadius(double _shaftRadius)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->shaftRadius = _shaftRadius;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->ShaftRadiusChanged();
-
-  gzdbg << "ShaftRadius: " << this->dataPtr->shaftRadius << "\n";
-}
-
-/////////////////////////////////////////////////
-double ForceDisplay::HeadLength() const
-{
-  gzdbg << "HeadLength: " << this->dataPtr->headLength << "\n";
-
-  return this->dataPtr->headLength;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetHeadLength(double _headLength)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->headLength = _headLength;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->HeadLengthChanged();
-
-  gzdbg << "HeadLength: " << this->dataPtr->headLength << "\n";
-}
-
-/////////////////////////////////////////////////
-double ForceDisplay::HeadRadius() const
-{
-  gzdbg << "HeadRadius: " << this->dataPtr->headRadius << "\n";
-
-  return this->dataPtr->headRadius;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetHeadRadius(double _headRadius)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->headRadius = _headRadius;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->HeadRadiusChanged();
-
-  gzdbg << "HeadRadius: " << this->dataPtr->headRadius << "\n";
-}
-
-/////////////////////////////////////////////////
-double ForceDisplay::AxesLength() const
-{
-  gzdbg << "AxesLength: " << this->dataPtr->axesLength << "\n";
-
-  return this->dataPtr->axesLength;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetAxesLength(double _axesLength)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->axesLength = _axesLength;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->AxesLengthChanged();
-
-  gzdbg << "AxesLength: " << this->dataPtr->axesLength << "\n";
-}
-
-/////////////////////////////////////////////////
-double ForceDisplay::AxesRadius() const
-{
-  gzdbg << "AxesRadius: " << this->dataPtr->axesRadius << "\n";
-
-  return this->dataPtr->axesRadius;
-}
-
-/////////////////////////////////////////////////
-void ForceDisplay::SetAxesRadius(double _axesRadius)
-{
-  std::lock_guard<std::mutex> lock(this->dataPtr->mutex);
-  this->dataPtr->axesRadius = _axesRadius;
-  this->dataPtr->shapeDirty = true;
-  this->dataPtr->sceneDirty = true;
-  this->AxesRadiusChanged();
-
-  gzdbg << "AxesRadius: " << this->dataPtr->axesRadius << "\n";
 }
 
 }  // namespace gui

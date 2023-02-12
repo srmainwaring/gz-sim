@@ -118,56 +118,9 @@ Rectangle {
       ToolTip.text: qsTr("The wrench update rate (Hz).")
     }
 
-    // Filter Size
-    Text {
-      id: filterSizeText
-      Layout.columnSpan: 2
-      text: "Filter Size"
-      color: "dimgrey"
-    }
-    GzSpinBox {
-      id: filterSize
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      maximumValue: 1000
-      minimumValue: 1
-      decimals: 0
-      stepSize: 10
-      value: ForceDisplay.filterSize
-      onEditingFinished: {
-        ForceDisplay.SetFilterSize(filterSize.value)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("The number of wrench messages to display.")
-    }
-
-    // Shape
-    Text {
-      id: shapeText
-      Layout.columnSpan: 2
-      text: "Shape"
-      color: "dimgrey"
-    }
-    ComboBox {
-      id: shape
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      currentIndex: ForceDisplay.shapeIndex
-      model: [ "Arrow", "Axis" ]
-      onCurrentIndexChanged: {
-        if (currentIndex < 0) {
-          return;
-        }
-        ForceDisplay.SetShapeIndex(currentIndex)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Shape to display the wrench as.")
-    }
-
     // Color
     Text {
       id: colorText
-      visible: shape.currentIndex === 0
       Layout.columnSpan: 2
       text: "Color"
       color: "dimgrey"
@@ -175,7 +128,6 @@ Rectangle {
     RowLayout {
       Layout.columnSpan: 2
       Layout.fillWidth: true
-      visible: shape.currentIndex === 0
 
       Button {
         id: colorButton
@@ -211,7 +163,6 @@ Rectangle {
     // Alpha
     Text {
       id: alphaText
-      visible: shape.currentIndex === 0
       Layout.columnSpan: 2
       text: "Alpha"
       color: "dimgrey"
@@ -238,168 +189,6 @@ Rectangle {
       }
       ToolTip.visible: hovered
       ToolTip.text: qsTr("Amount of transparency to apply to the arrow.")
-    }
-
-    //  Shaft Length
-    Text {
-      id: shaftLengthText
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      text: "Shaft Length"
-      color: "dimgrey"
-    }
-    TextField {
-      id: shaftLength
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      placeholderText: "0.5"
-      text: ForceDisplay.shaftLength.toFixed(1)
-      validator: DoubleValidator {
-        bottom: 0.0
-        top: 10.0
-        decimals: 1
-      }
-      onAccepted: {
-        ForceDisplay.SetShaftLength(shaftLength.text)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Length of the arrow's shaft, in meters.")
-    }
-
-    //  Shaft Radius
-    Text {
-      id: shaftRadiusText
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      text: "Shaft Radius"
-      color: "dimgrey"
-    }
-    TextField {
-      id: shaftRadius
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      placeholderText: "0.05"
-      text: ForceDisplay.shaftRadius.toFixed(2)
-      validator: DoubleValidator {
-        bottom: 0.0
-        top: 1.0
-        decimals: 2
-      }
-      onAccepted: {
-        ForceDisplay.SetShaftRadius(shaftRadius.text)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Radius of the arrow's shaft, in meters.")
-    }
-
-    //  Head Length
-    Text {
-      id: headLengthText
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      text: "Head Length"
-      color: "dimgrey"
-    }
-    TextField {
-      id: headLength
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      placeholderText: "0.25"
-      text: ForceDisplay.headLength.toFixed(1)
-      validator: DoubleValidator {
-        bottom: 0.0
-        top: 3.0
-        decimals: 2
-      }
-      onAccepted: {
-        ForceDisplay.SetHeadLength(headLength.text)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Length of the arrow's head, in meters.")
-    }
-
-    //  Head Radius
-    Text {
-      id: headRadiusText
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      text: "Head Radius"
-      color: "dimgrey"
-    }
-    TextField {
-      id: headRadius
-      visible: shape.currentIndex === 0
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      placeholderText: "0.10"
-      text: ForceDisplay.headRadius.toFixed(2)
-      validator: DoubleValidator {
-        bottom: 0.0
-        top: 1.0
-        decimals: 2
-      }
-      onAccepted: {
-        ForceDisplay.SetHeadRadius(headRadius.text)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Length of the arrow's head, in meters.")
-    }
-
-    // Axes Length
-    Text {
-      id: axesLengthText
-      visible: shape.currentIndex === 1
-      Layout.columnSpan: 2
-      text: "Axes Length"
-      color: "dimgrey"
-    }
-    TextField {
-      id: axesLength
-      visible: shape.currentIndex === 1
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      placeholderText: "1.0"
-      text: ForceDisplay.axesLength.toFixed(1)
-      validator: DoubleValidator {
-        bottom: 0.0
-        top: 100.0
-        decimals: 1
-      }
-      onAccepted: {
-        ForceDisplay.SetAxesLength(axesLength.text)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Length of each axis, in meters.")
-    }
-
-    // Axes Radius
-    Text {
-      id: axesRadiusText
-      visible: shape.currentIndex === 1
-      Layout.columnSpan: 2
-      text: "Axes Radius"
-      color: "dimgrey"
-    }
-    TextField {
-      id: axesRadius
-      visible: shape.currentIndex === 1
-      Layout.columnSpan: 2
-      Layout.fillWidth: true
-      placeholderText: "0.10"
-      text: ForceDisplay.axesRadius.toFixed(2)
-      validator: DoubleValidator {
-        bottom: 0.0
-        top: 10
-        decimals: 2
-      }
-      onAccepted: {
-        ForceDisplay.SetAxesRadius(axesRadius.text)
-      }
-      ToolTip.visible: hovered
-      ToolTip.text: qsTr("Radius of each axis, in meters.")
     }
 
     // Bottom spacer

@@ -51,22 +51,6 @@ class ForceDisplay : public gz::gui::Plugin
     NOTIFY UpdateRateChanged
   )
 
-  /// \brief Filter Size.
-  Q_PROPERTY(
-    int filterSize
-    READ FilterSize
-    WRITE SetFilterSize
-    NOTIFY FilterSizeChanged
-  )
-
-  /// \brief Shape Index.
-  Q_PROPERTY(
-    int shapeIndex
-    READ ShapeIndex
-    WRITE SetShapeIndex
-    NOTIFY ShapeIndexChanged
-  )
-
   /// \brief Color.
   Q_PROPERTY(
     QColor color
@@ -83,54 +67,6 @@ class ForceDisplay : public gz::gui::Plugin
     NOTIFY AlphaChanged
   )
 
-  /// \brief Shaft Length.
-  Q_PROPERTY(
-    double shaftLength
-    READ ShaftLength
-    WRITE SetShaftLength
-    NOTIFY ShaftLengthChanged
-  )
-
-  /// \brief Shaft Radius.
-  Q_PROPERTY(
-    double shaftRadius
-    READ ShaftRadius
-    WRITE SetShaftRadius
-    NOTIFY ShaftRadiusChanged
-  )
-
-  /// \brief Head Length.
-  Q_PROPERTY(
-    double headLength
-    READ HeadLength
-    WRITE SetHeadLength
-    NOTIFY HeadLengthChanged
-  )
-
-  /// \brief Head Radius.
-  Q_PROPERTY(
-    double headRadius
-    READ HeadRadius
-    WRITE SetHeadRadius
-    NOTIFY HeadRadiusChanged
-  )
-
-  /// \brief Axes Length.
-  Q_PROPERTY(
-    double axesLength
-    READ AxesLength
-    WRITE SetAxesLength
-    NOTIFY AxesLengthChanged
-  )
-
-  /// \brief Axes Radius.
-  Q_PROPERTY(
-    double axesRadius
-    READ AxesRadius
-    WRITE SetAxesRadius
-    NOTIFY AxesRadiusChanged
-  )
-
   /// \brief Constructor
   public: ForceDisplay();
 
@@ -140,43 +76,13 @@ class ForceDisplay : public gz::gui::Plugin
   // Documentation inherited
   public: void LoadConfig(const tinyxml2::XMLElement *_pluginElem) override;
 
-  /// \brief Get the topic.
-  /// \return Topic, the wrench topic.
   public: Q_INVOKABLE QString Topic() const;
-
-  /// \brief Set the topic.
-  /// \param[in] _topic The wrench topic.
   public: Q_INVOKABLE void SetTopic(const QString &_topic);
-
-  /// \brief Notify that the topic has changed
   signals: void TopicChanged();
 
-  /// \brief Get the update rate.
-  /// \return The current update rate.
   public: Q_INVOKABLE double UpdateRate() const;
-
-  /// \brief Set the update rate.
-  /// \param[in] _updateRate New update rate.
   public: Q_INVOKABLE void SetUpdateRate(double _updateRate);
-
-  /// \brief Notify that the update rate has changed.
   signals: void UpdateRateChanged();
-
-  /// \brief Filter size sets the number of wrenches kept.
-  /// \return The current filter size.
-  public: Q_INVOKABLE int FilterSize() const;
-
-  /// \brief Set the filter size. If the display has more than
-  /// this number, older wrenches are removed.
-  /// \param[in] _filterSize Filter size.
-  public: Q_INVOKABLE void SetFilterSize(int _filterSize);
-
-  /// \brief Notify that the filter size has changed.
-  signals: void FilterSizeChanged();
-
-  public: Q_INVOKABLE int ShapeIndex() const;
-  public: Q_INVOKABLE void SetShapeIndex(int _shapeIndex);
-  signals: void ShapeIndexChanged();
 
   public: Q_INVOKABLE QColor Color() const;
   public: Q_INVOKABLE void SetColor(const QColor &_color);
@@ -185,30 +91,6 @@ class ForceDisplay : public gz::gui::Plugin
   public: Q_INVOKABLE double Alpha() const;
   public: Q_INVOKABLE void SetAlpha(double _alpha);
   signals: void AlphaChanged();
-
-  public: Q_INVOKABLE double ShaftLength() const;
-  public: Q_INVOKABLE void SetShaftLength(double _shaftLength);
-  signals: void ShaftLengthChanged();
-
-  public: Q_INVOKABLE double ShaftRadius() const;
-  public: Q_INVOKABLE void SetShaftRadius(double _shaftRadius);
-  signals: void ShaftRadiusChanged();
-
-  public: Q_INVOKABLE double HeadLength() const;
-  public: Q_INVOKABLE void SetHeadLength(double _headLength);
-  signals: void HeadLengthChanged();
-
-  public: Q_INVOKABLE double HeadRadius() const;
-  public: Q_INVOKABLE void SetHeadRadius(double _headRadius);
-  signals: void HeadRadiusChanged();
-
-  public: Q_INVOKABLE double AxesLength() const;
-  public: Q_INVOKABLE void SetAxesLength(double _axesLength);
-  signals: void AxesLengthChanged();
-
-  public: Q_INVOKABLE double AxesRadius() const;
-  public: Q_INVOKABLE void SetAxesRadius(double _axesRadius);
-  signals: void AxesRadiusChanged();
 
   // Documentation inherited
   protected: bool eventFilter(QObject *_obj, QEvent *_event) override;
