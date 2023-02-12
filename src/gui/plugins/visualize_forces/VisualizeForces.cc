@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Open Source Robotics Foundation
+ * Copyright (C) 2023 Open Source Robotics Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,352 +15,471 @@
  *
 */
 
+#include "VisualizeForces.hh"
+
+#include <chrono>
 #include <queue>
 #include <random>
 #include <string>
+#include <tuple>
 #include <unordered_set>
 #include <vector>
 
-#include <ignition/common/Profiler.hh>
+#include <gz/common/Profiler.hh>
 
-#include <ignition/plugin/Register.hh>
+#include <gz/gui/Application.hh>
+#include <gz/gui/Conversions.hh>
+#include <gz/gui/GuiEvents.hh>
+#include <gz/gui/MainWindow.hh>
 
-#include <ignition/math/Pose3.hh>
-#include <ignition/math/Vector3.hh>
+#include <gz/math/Pose3.hh>
+#include <gz/math/Vector3.hh>
 
-#include <ignition/msgs/marker.pb.h>
-#include <ignition/msgs/wrench_visual.pb.h>
+#include <gz/msgs/entity_wrench_map.pb.h>
 
-#include <ignition/transport/Node.hh>
+#include <gz/plugin/Register.hh>
 
-#include <ignition/gui/Application.hh>
-#include <ignition/gui/Conversions.hh>
-#include <ignition/gui/MainWindow.hh>
+#include <gz/rendering/ArrowVisual.hh>
+#include <gz/rendering/RenderEngine.hh>
+#include <gz/rendering/RenderingIface.hh>
+#include <gz/rendering/RenderTypes.hh>
+#include <gz/rendering/Scene.hh>
 
-#include "ignition/gazebo/components/WrenchVisual.hh"
-#include "ignition/gazebo/Link.hh"
-#include "ignition/gazebo/World.hh"
-#include "VisualizeForces.hh"
+#include <gz/transport/Node.hh>
 
-namespace ignition
+#include "gz/sim/components/EntityWrench.hh"
+#include "gz/sim/components/Pose.hh"
+#include "gz/sim/Link.hh"
+#include "gz/sim/World.hh"
+
+namespace gz
 {
-namespace gazebo
+namespace sim
 {
-inline namespace IGNITION_GAZEBO_VERSION_NAMESPACE
+inline namespace GZ_SIM_VERSION_NAMESPACE
 {
-  /// \brief Private data class for VisualizeForces
-  class VisualizeForcesPrivate
+/// \brief Private data class for VisualizeForces
+class VisualizeForcesPrivate
+{
+  /// \brief Model used to synchronize with the GUI
+  public: ForceListModel model;
+
+  /// \brief Node for receiving incoming requests.
+  public: transport::Node node;
+
+  /// \brief Queue for incoming messages
+  public: std::queue<std::tuple<math::Pose3d, msgs::EntityWrench>> queue;
+
+  /// \brief Mutex for queue and other variables shared with render thread.
+  public: std::mutex mutex;
+
+  /// \brief Set of markers already drawn.
+  public: std::unordered_set<std::string> onScreenMarkers;
+
+  /// \brief Pointer to the scene.
+  public: rendering::ScenePtr scene;
+
+  /// \brief Visuals for each force marker.
+  public: std::unordered_map<
+      std::string, rendering::ArrowVisualPtr> visuals;
+
+  /// \brief Set the scale. A scale of 1 => force of 1N has a marker length 1m.
+  public: double scale{1.0};
+
+  /// \brief System update period calculated from <update_rate>
+  public: std::chrono::steady_clock::duration updatePeriod{0};
+
+  /// \brief Last system update simulation time
+  public: std::chrono::steady_clock::duration lastUpdateTime{0};
+
+
+  /// \brief Destructor
+  public: ~VisualizeForcesPrivate();
+
+  /// \brief Constructor
+  public: VisualizeForcesPrivate();
+
+  /// \brief Get the wrench visuals - runs on GUI thread.
+  /// \param[in] _ecm - the ecm.
+  public: void RetrieveWrenchesFromEcm(EntityComponentManager &_ecm);
+
+  /// \brief Render force visuals - runs on render thread.
+  public: void OnRender();
+
+  public: void AddVisual(const std::string &_ns,
+      const math::Color &_color);
+
+  public: void RemoveVisual(const std::string &_ns);
+
+  public: void ClearVisuals();
+};
+
+/////////////////////////////////////////////////
+VisualizeForcesPrivate::~VisualizeForcesPrivate()
+{
+  this->ClearVisuals();
+}
+
+/////////////////////////////////////////////////
+VisualizeForcesPrivate::VisualizeForcesPrivate() = default;
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::RetrieveWrenchesFromEcm(
+    EntityComponentManager &_ecm)
+{
+  std::lock_guard<std::mutex> lock(mutex);
   {
-    /// \brief Model used to synchronize with the GUI
-    public: ForceListModel model;
-
-    /// \brief Node for receiving incoming requests.
-    public: transport::Node node;
-
-    /// \brief queue for incoming messages
-    public: std::queue<msgs::WrenchVisual> queue;
-
-    /// \brief queue lock
-    public: std::mutex mtx;
-
-    /// \brief Set of markers already drawn.
-    public: std::unordered_set<std::string> onScreenMarkers;
-
-    public: std::string worldName;
-
-    /////////////////////////////////////////////////
-    /// \brief Default constructors
-    public: VisualizeForcesPrivate()
-    {
-    }
-
-    /////////////////////////////////////////////////
-    /// \brief Handler for when we have to visualize stuff. Simply enqueues
-    /// items to be visualized
-    /// \param _stamped - The incoming message
-    public: void VisualizeCallback(const msgs::WrenchVisual &_stamped)
-    {
-      std::lock_guard<std::mutex> lock(mtx);
-      queue.push(_stamped);
-    }
-
-    /////////////////////////////////////////////////
-    /// \brief Get the wrench visuals
-    /// \param[in] _ecm - the ecm.
-    public: void RetrieveWrenchesFromEcm(EntityComponentManager &_ecm)
-    {
-      std::vector<Entity> entities;
-      _ecm.Each<components::WrenchVisual_V>(
+    _ecm.Each<components::WorldPose, components::EntityWrenchMap>(
       [&](const Entity &_entity,
-          components::WrenchVisual_V *_visuals) -> bool
+          components::WorldPose *_worldPose,
+          components::EntityWrenchMap *_entityWrenchMap) -> bool
       {
-        for(auto wrench: _visuals->Data().data())
-        {
-          this->queue.push(wrench);
-          igndbg << "Visualizing wrench for entity [" << wrench.entity().id()
-                 << "]" << "From [" << wrench.label() << "]" << std::endl;
-        }
-        entities.push_back(_entity);
-        return true;
-      });
-      for (auto entity: entities)
-        _ecm.RemoveComponent<components::WrenchVisual_V>(entity);
-    }
-
-    /////////////////////////////////////////////////
-    /// \brief Publish the force markers
-    public: void PublishMarkers()
-    {
-      while (true)
+      // Push all the wrenches for this entity to the queue.
+      for (auto& [key, value] : _entityWrenchMap->Data().wrenches())
       {
-        // Get all messages off the queue
-        msgs::WrenchVisual wrenchMsg;
-        {
-          std::lock_guard<std::mutex> lock(mtx);
-          if(this->queue.empty())
-          {
-            return;
-          }
-          wrenchMsg = this->queue.front();
-          queue.pop();
-        }
-        // Check if we should render the force based on user's settings.
-        auto color = this->model.getRenderColor(wrenchMsg);
-
-        // Namespace markers
-        auto ns = "force/" + std::to_string(wrenchMsg.entity().id())
-          + "/" + wrenchMsg.label();
-
-        // Marker color if marker is on screen.
-        if (!color.has_value())
-        {
-          // If the marker is already on screen delete it
-          if (this->onScreenMarkers.count(ns))
-          {
-            this->onScreenMarkers.erase(ns);
-            msgs::Marker marker;
-            marker.set_ns(ns);
-            marker.set_id(1);
-            marker.set_action(msgs::Marker::DELETE_MARKER);
-            this->node.Request("/marker", marker);
-          }
-          continue;
-        }
-        msgs::Marker marker;
-        auto force = msgs::Convert(wrenchMsg.wrench().force());
-
-        this->onScreenMarkers.insert(ns);
-        marker.set_ns(ns);
-        marker.set_id(1);
-        marker.set_action(msgs::Marker::ADD_MODIFY);
-        marker.set_type(msgs::Marker::CYLINDER);
-
-        marker.set_visibility(msgs::Marker::GUI);
-
-        ignition::msgs::Set(marker.mutable_material()->mutable_ambient(),
-          color.value());
-        ignition::msgs::Set(marker.mutable_material()->mutable_diffuse(),
-          color.value());
-
-        if (std::abs(force.Length()) > 1e-5)
-        {
-
-          math::Quaterniond qt;
-          qt.From2Axes(math::Vector3d::UnitZ, force.Normalized());
-
-          // translate cylinder up
-          math::Pose3d translateCylinder(
-            math::Vector3d(0, 0, force.Length() / 2),
-            math::Quaterniond());
-          math::Pose3d rotation(math::Vector3d(0, 0, 0), qt);
-          math::Pose3d arrowPose(
-            msgs::Convert(wrenchMsg.pos()), math::Quaterniond());
-          ignition::msgs::Set(
-            marker.mutable_pose(), arrowPose * rotation * translateCylinder);
-          ignition::msgs::Set(
-            marker.mutable_scale(),
-            math::Vector3d(0.1, 0.1, force.Length()));
-
-          this->node.Request("/marker", marker);
-        }
+        this->queue.push({_worldPose->Data(), value});
       }
-    }
-  };
 
-  /////////////////////////////////////////////////
-  ForceListModel::ForceListModel()
+      // debugging
+      // {
+      //   std::stringstream ss;
+      //   ss << "Received EntityWrenchMap for entity ["
+      //     << _entity << "]\n"
+      //     << "WorldPose [" << _worldPose->Data().Pos() << "]\n"
+      //     << "Size " << _entityWrenchMap->Data().wrenches().size() << "\n";
+      //   for (auto& [key, value] : _entityWrenchMap->Data().wrenches())
+      //   {
+      //     ss << "Key: " << key << "\n"
+      //        << "Msg: " << value.DebugString() << "\n";
+      //   }
+      //   gzdbg << ss.str();
+      // }
+
+      return true;
+    });
+  }
+}
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::OnRender()
+{
+  // Apply lock as this is run on the render thread
+  std::lock_guard<std::mutex> lock(mutex);
+
+  if (nullptr == this->scene)
   {
-
+    this->scene = rendering::sceneFromFirstRenderEngine();
+    if (nullptr == this->scene)
+    {
+      return;
+    }
   }
 
-  /////////////////////////////////////////////////
-  std::optional<math::Color> ForceListModel::getRenderColor(
-    msgs::WrenchVisual &_wrench)
+  while (true)
   {
-    auto pluginList = this->arrow_mapping.find(_wrench.entity().id());
-
-    if (pluginList == this->arrow_mapping.end())
+    // Get all messages off the queue
+    math::Pose3d worldPose;
+    msgs::EntityWrench wrenchMsg;
     {
-      auto color = retrieveOrAssignColor(_wrench.label());
-      beginInsertRows( QModelIndex(), this->arrows.size(), this->arrows.size());
-      arrows.push_back(
-        {
-          _wrench.entity().name() + " (" +
+      if(this->queue.empty())
+      {
+        return;
+      }
+      std::tie(worldPose, wrenchMsg) = this->queue.front();
+      queue.pop();
+    }
+    // Check if we should render the force based on user's settings.
+    auto color = this->model.getRenderColor(wrenchMsg);
+
+    std::string label;
+    for (auto& values : wrenchMsg.header().data())
+    {
+      if (values.key() == "label")
+        label = values.value(0);
+    }
+
+    // Namespace markers
+    auto ns = "force/" + std::to_string(wrenchMsg.entity().id())
+      + "/" + label;
+
+    // Marker color if marker is on screen.
+    if (!color.has_value())
+    {
+      // If the marker is already on screen delete it
+      if (this->onScreenMarkers.count(ns))
+      {
+        this->onScreenMarkers.erase(ns);
+        this->RemoveVisual(ns);
+      }
+      continue;
+    }
+    auto force = msgs::Convert(wrenchMsg.wrench().force());
+
+    this->onScreenMarkers.insert(ns);
+    if (this->visuals.find(ns) == this->visuals.end())
+    {
+      gzdbg << "Adding arrow visual [" << ns << "]\n"
+            << "Color   [" << color.value() << "]\n"
+            << "Thread  [" << QThread::currentThread() << "]\n";
+
+      this->AddVisual(ns, color.value());
+    }
+
+    if (std::abs(force.Length()) > 1.0E-5)
+    {
+      math::Quaterniond quat;
+      quat.SetFrom2Axes(math::Vector3d::UnitZ, force.Normalized());
+      math::Pose3d rotation(math::Vector3d::Zero, quat);
+      math::Pose3d forcePose(worldPose.Pos(), math::Quaterniond());
+
+      auto visual = this->visuals[ns];
+      visual->SetWorldPose(forcePose * rotation);
+      visual->SetLocalScale(1.0, 1.0, force.Length() * this->scale);
+
+      // gzdbg << "Wrench visual for entity ["
+      //       << wrenchMsg.entity().id() << "]\n"
+      //       << "Force     [" << force << "]\n"
+      //       << "Position  [" << forcePose.Pos() << "]\n";
+    }
+  }
+}
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::AddVisual(
+    const std::string &_ns, const math::Color &_color)
+{
+  auto rootVisual = this->scene->RootVisual();
+
+  rendering::MaterialPtr mat = this->scene->CreateMaterial();
+  mat->SetAmbient(_color.R(), _color.G(), _color.B(), 1.0);
+  mat->SetDiffuse(_color.R(), _color.G(), _color.B(), 1.0);
+  mat->SetSpecular(0.5, 0.5, 0.5, 1.0);
+  mat->SetShininess(50);
+  mat->SetReflectivity(0);
+  mat->SetCastShadows(false);
+
+  auto visual = this->scene->CreateArrowVisual();
+  visual->SetMaterial(mat);
+
+  visual->ShowArrowHead(false);
+  visual->ShowArrowShaft(true);
+  visual->ShowArrowRotation(false);
+  visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
+
+  this->visuals[_ns] = visual;
+  rootVisual->AddChild(this->visuals[_ns]);
+}
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::RemoveVisual(const std::string &_ns)
+{
+  if (this->visuals.find(_ns) != this->visuals.end())
+  {
+    auto visual = this->visuals[_ns];
+    if (visual != nullptr && visual->HasParent())
+    {
+      visual->Parent()->RemoveChild(visual);
+      this->scene->DestroyVisual(visual, true);
+      visual.reset();
+    }
+    this->visuals.erase(_ns);
+  }
+}
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::ClearVisuals()
+{
+  for (auto&& item : this->visuals)
+  {
+    auto visual = item.second;
+    if (visual != nullptr && visual->HasParent())
+    {
+      visual->Parent()->RemoveChild(visual);
+      this->scene->DestroyVisual(visual, true);
+    }
+  }
+  this->visuals.clear();
+}
+
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
+ForceListModel::ForceListModel() = default;
+
+/////////////////////////////////////////////////
+std::optional<math::Color> ForceListModel::getRenderColor(
+  msgs::EntityWrench &_wrench)
+{
+  auto pluginList = this->force_mapping.find(_wrench.entity().id());
+
+  std::string label;
+  for (auto& values : _wrench.header().data())
+  {
+    if (values.key() == "label")
+      label = values.value(0);
+  }
+
+  // add new force list for the entity
+  if (pluginList == this->force_mapping.end())
+  {
+
+    auto color = retrieveOrAssignColor(label);
+    beginInsertRows(QModelIndex(), this->forceInfo.size(),
+        this->forceInfo.size());
+    forceInfo.push_back(
+      {
+        _wrench.entity().name() + " (" +
+        std::to_string(_wrench.entity().id()) +")",
+        label,
+        true
+      }
+    );
+
+    force_mapping[_wrench.entity().id()][label] =
+      {this->forceInfo.size() -1};
+    endInsertRows();
+    return color;
+  }
+
+  if(pluginList->second.count(label) == 0)
+  {
+    auto color = retrieveOrAssignColor(label);
+    beginInsertRows(QModelIndex(), this->forceInfo.size(),
+        this->forceInfo.size());
+    this->forceInfo.push_back(
+      {
+        _wrench.entity().name() + " (" +
           std::to_string(_wrench.entity().id()) +")",
-          _wrench.label(),
-          true
-        }
-      );
-
-      arrow_mapping[_wrench.entity().id()][_wrench.label()] =
-        {this->arrows.size() -1};
-      endInsertRows();
-      return color;
-    }
-
-    if(pluginList->second.count(_wrench.label()) == 0)
-    {
-      auto color = retrieveOrAssignColor(_wrench.label());
-      beginInsertRows(QModelIndex(), this->arrows.size(),  this->arrows.size());
-      this->arrows.push_back(
-        {
-          _wrench.entity().name() + " (" +
-            std::to_string(_wrench.entity().id()) +")",
-          _wrench.label(),
-          true
-        }
-      );
-      pluginList->second[_wrench.label()] = {this->arrows.size() -1};
-      endInsertRows();
-      return color;
-    }
-
-    const auto arrow = this->arrows[pluginList->second[_wrench.label()].index];
-
-    if (!arrow.visible)
-      return std::nullopt;
-
-    return retrieveOrAssignColor(_wrench.label());
+        label,
+        true
+      }
+    );
+    pluginList->second[label] = {this->forceInfo.size() -1};
+    endInsertRows();
+    return color;
   }
 
-  /////////////////////////////////////////////////
-  void ForceListModel::setVisibility(int index, bool visible)
-  {
-    if (index < 0 || static_cast<std::size_t>(index) > this->arrows.size())
-      return;
+  const auto markerInfo = this->forceInfo[
+      pluginList->second[label].index];
 
-    this->arrows[index].visible = visible;
-    auto modelIndex = createIndex(index, 0);
-    dataChanged(modelIndex, modelIndex, {ArrowRoles::VisibleRole});
+  if (!markerInfo.visible)
+    return std::nullopt;
+
+  return retrieveOrAssignColor(label);
+}
+
+/////////////////////////////////////////////////
+void ForceListModel::setVisibility(int index, bool visible)
+{
+  if (index < 0 || static_cast<std::size_t>(index) > this->forceInfo.size())
+    return;
+
+  this->forceInfo[index].visible = visible;
+  auto modelIndex = createIndex(index, 0);
+  dataChanged(modelIndex, modelIndex, {ForceRoles::VisibleRole});
+}
+
+/////////////////////////////////////////////////
+void ForceListModel::setColor(int index, QColor color)
+{
+  if (index < 0 || static_cast<std::size_t>(index) > this->forceInfo.size())
+    return;
+
+  auto plugin = this->forceInfo[index].pluginName;
+
+  double r, g, b;
+  color.getRgbF(&r, &g, &b);
+  auto gzColor = math::Color{
+    static_cast<float>(r),
+    static_cast<float>(g),
+    static_cast<float>(b)
+  };
+  this->colors[plugin] = gzColor;
+
+  auto start = createIndex(0, 0);
+  auto end = createIndex(this->forceInfo.size() - 1, 0);
+  dataChanged(start, end, {ForceRoles::ColorRole});
+}
+
+/////////////////////////////////////////////////
+math::Color ForceListModel::retrieveOrAssignColor(std::string _pluginname)
+{
+  auto color = this->colors.find(_pluginname);
+
+  if (color == this->colors.end())
+  {
+    static std::default_random_engine e;
+    static std::uniform_real_distribution<float> colorPicker(0.0f, 1.0f);
+
+    float r = colorPicker(e);
+    float g = colorPicker(e);
+    float b = colorPicker(e);
+
+    auto col = math::Color{r, g, b};
+    this->colors[_pluginname] = col;
+    return col;
   }
 
-  /////////////////////////////////////////////////
-  void ForceListModel::setColor(int index, QColor color)
-  {
-    if (index < 0 || static_cast<std::size_t>(index) > this->arrows.size())
-      return;
+  return color->second;
+}
 
-    auto plugin = this->arrows[index].pluginName;
-
-    double r, g, b;
-    color.getRgbF(&r, &g, &b);
-    auto ignColor = math::Color{
-      static_cast<float>(r),
-      static_cast<float>(g),
-      static_cast<float>(b)
-    };
-    this->colors[plugin] = ignColor;
-
-    auto start = createIndex(0, 0);
-    auto end = createIndex(this->arrows.size() - 1, 0);
-    dataChanged(start, end, {ArrowRoles::ColorRole});
-  }
-
-  /////////////////////////////////////////////////
-  math::Color ForceListModel::retrieveOrAssignColor(std::string _pluginname)
-  {
-    auto color = this->colors.find(_pluginname);
-
-    if (color == this->colors.end())
-    {
-      static std::default_random_engine e;
-      static std::uniform_real_distribution<float> colorPicker(0.0f, 1.0f);
-
-      float r = colorPicker(e);
-      float g = colorPicker(e);
-      float b = colorPicker(e);
-
-      auto col = math::Color{r, g, b};
-      this->colors[_pluginname] = col;
-      return col;
-    }
-
-    return color->second;
-  }
-
-  /////////////////////////////////////////////////
-  QVariant ForceListModel::data(
-    const QModelIndex &index, int role) const
-  {
-    if (index.row() < 0 ||
-      static_cast<std::size_t>(index.row()) > this->arrows.size())
-      return QVariant();
-
-    if (role == ArrowRoles::LinkRole)
-    {
-      return QString::fromStdString(this->arrows[index.row()].linkName);
-    }
-
-    if (role == ArrowRoles::PluginRole)
-    {
-      return QString::fromStdString(this->arrows[index.row()].pluginName);
-    }
-
-    if (role == ArrowRoles::ColorRole)
-    {
-      const auto arrow = this->arrows[index.row()];
-      const auto color = this->colors.find(arrow.pluginName)->second;
-
-      QColor qcolor(color.R() * 255, color.G() * 255, color.B() *255);
-      return qcolor;
-    }
-
-    if (role == ArrowRoles::VisibleRole)
-    {
-      return arrows[index.row()].visible;
-    }
-
+/////////////////////////////////////////////////
+QVariant ForceListModel::data(
+  const QModelIndex &index, int role) const
+{
+  if (index.row() < 0 ||
+    static_cast<std::size_t>(index.row()) > this->forceInfo.size())
     return QVariant();
-  }
 
-  /////////////////////////////////////////////////
-  int ForceListModel::rowCount(const QModelIndex &/*unused*/) const
+  if (role == ForceRoles::LinkRole)
   {
-    return arrows.size();
+    return QString::fromStdString(this->forceInfo[index.row()].linkName);
   }
 
-  /////////////////////////////////////////////////
-  QHash<int, QByteArray> ForceListModel::roleNames() const
+  if (role == ForceRoles::PluginRole)
   {
-    return {
-      std::pair(ArrowRoles::LinkRole, "link"),
-      std::pair(ArrowRoles::PluginRole, "plugin"),
-      std::pair(ArrowRoles::ColorRole, "arrowColor"),
-      std::pair(ArrowRoles::VisibleRole, "isVisible")
-    };
+    return QString::fromStdString(this->forceInfo[index.row()].pluginName);
   }
-}
-}
+
+  if (role == ForceRoles::ColorRole)
+  {
+    const auto arrow = this->forceInfo[index.row()];
+    const auto color = this->colors.find(arrow.pluginName)->second;
+
+    QColor qcolor(color.R() * 255, color.G() * 255, color.B() *255);
+    return qcolor;
+  }
+
+  if (role == ForceRoles::VisibleRole)
+  {
+    return forceInfo[index.row()].visible;
+  }
+
+  return QVariant();
 }
 
-using namespace ignition;
-using namespace gazebo;
+/////////////////////////////////////////////////
+int ForceListModel::rowCount(const QModelIndex &/*unused*/) const
+{
+  return forceInfo.size();
+}
 
+/////////////////////////////////////////////////
+QHash<int, QByteArray> ForceListModel::roleNames() const
+{
+  return {
+    std::pair(ForceRoles::LinkRole, "link"),
+    std::pair(ForceRoles::PluginRole, "plugin"),
+    std::pair(ForceRoles::ColorRole, "arrowColor"),
+    std::pair(ForceRoles::VisibleRole, "isVisible")
+  };
+}
+
+/////////////////////////////////////////////////
 /////////////////////////////////////////////////
 VisualizeForces::VisualizeForces()
   : GuiSystem(), dataPtr(new VisualizeForcesPrivate)
 {
-  ignition::gui::App()->Engine()->rootContext()->setContextProperty(
+  gz::gui::App()->Engine()->rootContext()->setContextProperty(
     "ForceListModel", &this->dataPtr->model);
 }
 
@@ -368,21 +487,77 @@ VisualizeForces::VisualizeForces()
 VisualizeForces::~VisualizeForces() = default;
 
 /////////////////////////////////////////////////
-void VisualizeForces::LoadConfig(const tinyxml2::XMLElement *)
+void VisualizeForces::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
 {
   if (this->title.empty())
+  {
     this->title = "Visualize forces";
+  }
+
+  // Parameters from SDF
+  if (_pluginElem)
+  {
+    {
+      auto elem = _pluginElem->FirstChildElement("scale");
+      if (nullptr != elem && nullptr != elem->GetText())
+      {
+        double value(1.0);
+        elem->QueryDoubleText(&value);
+        this->dataPtr->scale = value;
+      }
+    }
+
+    {
+      double rate(10.0);
+      auto elem = _pluginElem->FirstChildElement("update_rate");
+      if (nullptr != elem && nullptr != elem->GetText())
+      {
+        elem->QueryDoubleText(&rate);
+      }
+      std::chrono::duration<double> period{rate > 0.0 ? 1.0 / rate : 0.0};
+      this->dataPtr->updatePeriod = std::chrono::duration_cast<
+          std::chrono::steady_clock::duration>(period);
+    }
+  }
+
+  // Install filter to receive events from the main window.
+  gz::gui::App()->findChild<
+      gz::gui::MainWindow *>()->installEventFilter(this);
 }
 
-//////////////////////////////////////////////////
-void VisualizeForces::Update(const UpdateInfo &/*unused*/,
+/////////////////////////////////////////////////
+void VisualizeForces::Update(const UpdateInfo &_info,
     EntityComponentManager &_ecm)
 {
+  GZ_PROFILE("VisualizeForces::Update");
+  if (_info.paused) return;
+
+  // Throttle update rate
+  auto elapsed = _info.simTime - this->dataPtr->lastUpdateTime;
+  if (elapsed > std::chrono::steady_clock::duration::zero() &&
+      elapsed < this->dataPtr->updatePeriod)
+    return;
+  this->dataPtr->lastUpdateTime = _info.simTime;
+
   this->dataPtr->RetrieveWrenchesFromEcm(_ecm);
-  this->dataPtr->PublishMarkers();
 }
 
+/////////////////////////////////////////////////
+bool VisualizeForces::eventFilter(QObject *_obj, QEvent *_event)
+{
+  if (_event->type() == gz::gui::events::Render::kType)
+  {
+    this->dataPtr->OnRender();
+  }
+
+  // Standard event processing
+  return QObject::eventFilter(_obj, _event);
+}
+
+}  // namespace GZ_SIM_VERSION_NAMESPACE
+}  // namespace sim
+}  // namespace gz
 
 // Register this plugin
-IGNITION_ADD_PLUGIN(ignition::gazebo::VisualizeForces,
-                    ignition::gui::Plugin)
+GZ_ADD_PLUGIN(gz::sim::VisualizeForces,
+              gz::gui::Plugin)

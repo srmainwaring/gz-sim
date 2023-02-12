@@ -336,6 +336,11 @@ namespace gz
                                   const math::Vector3d &_torque,
                                   const math::Vector3d &_offset) const;
 
+      /// \brief Sets the visualization label used by the force visualization.
+      /// \param[in] _label The label used for force visualizations.
+      public: void SetVisualizationLabel(
+          const std::string &_label);
+
       /// \brief Pointer to private data.
       private: std::unique_ptr<LinkPrivate> dataPtr;
     };
