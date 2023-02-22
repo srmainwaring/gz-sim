@@ -43,6 +43,7 @@
 #include "gz/sim/components/Pose.hh"
 
 /// \todo(srmainwaring) includes for ForcePublisher
+#include <gz/msgs/Utility.hh>
 #include <gz/msgs/entity_wrench_map.pb.h>
 #include "gz/sim/components/EntityWrench.hh"
 
@@ -192,6 +193,11 @@ void ForcePublisher::PublishWorldWrench(const UpdateInfo &_info,
   // Populate data
   msgs::EntityWrench msg;
 
+  // Set time stamp
+  {
+    *msg.mutable_header()->mutable_stamp() = msgs::Convert(_info.simTime);
+  }
+
   // Set label
   {
     auto data = msg.mutable_header()->add_data();
@@ -219,6 +225,7 @@ void ForcePublisher::PublishWorldWrench(const UpdateInfo &_info,
 
   // Update map with wrench
   auto& data = entityWrenchMapComp->Data();
+  *data.mutable_header()->mutable_stamp() = msgs::Convert(_info.simTime);
   (*data.mutable_wrenches())[this->label] = msg;
 
   _ecm.SetChanged(this->entity, components::EntityWrenchMap::typeId,

@@ -271,8 +271,7 @@
         <visualize_forces>
           <visualize>1</visualize>
           <update_rate>60</update_rate>
-          <label>Blade1</label>
-          <topic>/model/lift_drag_demo_model/forces/lift_drag/blade1</topic>
+          <topic>/model/lift_drag_demo_model/link/blade_1/forces/lift_drag</topic>
         </visualize_forces>
       </plugin>
       <plugin
@@ -291,8 +290,7 @@
         <visualize_forces>
           <visualize>1</visualize>
           <update_rate>60</update_rate>
-          <label>Blade2</label>
-          <topic>/model/lift_drag_demo_model/forces/lift_drag/blade2</topic>
+          <topic>/model/lift_drag_demo_model/link/blade_2/forces/lift_drag</topic>
         </visualize_forces>
       </plugin>
 
