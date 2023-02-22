@@ -223,9 +223,25 @@ void ForcePublisher::PublishWorldWrench(const UpdateInfo &_info,
   msgs::Set(msg.mutable_wrench()->mutable_force(), _force);
   msgs::Set(msg.mutable_wrench()->mutable_torque(), _torque);
 
-  // Update map with wrench
+  // Update entity wrench map data.
   auto& data = entityWrenchMapComp->Data();
+
+  // Remove any messages with timestamp less than the current stamp.
+  for (auto iter = data.mutable_wrenches()->begin();
+       iter != data.mutable_wrenches()->end();
+       ++iter)
+  {
+    auto msgStamp = msgs::Convert(iter->second.header().stamp());
+    if (msgStamp <  _info.simTime)
+    {
+      data.mutable_wrenches()->erase(iter);
+    }
+  }
+
+  // Update time stamp
   *data.mutable_header()->mutable_stamp() = msgs::Convert(_info.simTime);
+ 
+  // Update map with wrench
   (*data.mutable_wrenches())[this->label] = msg;
 
   _ecm.SetChanged(this->entity, components::EntityWrenchMap::typeId,
