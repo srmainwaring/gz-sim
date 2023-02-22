@@ -268,6 +268,12 @@
         <forward>1 0 0</forward>
         <upward>0 0 1</upward>
         <link_name>blade_1</link_name>
+        <visualize_forces>
+          <visualize>1</visualize>
+          <update_rate>60</update_rate>
+          <label>Blade1</label>
+          <topic>/model/lift_drag_demo_model/forces/lift_drag/blade1</topic>
+        </visualize_forces>
       </plugin>
       <plugin
         filename="gz-sim-lift-drag-system"
@@ -282,6 +288,12 @@
         <forward>1 0 0</forward>
         <upward>0 0 1</upward>
         <link_name>blade_2</link_name>
+        <visualize_forces>
+          <visualize>1</visualize>
+          <update_rate>60</update_rate>
+          <label>Blade2</label>
+          <topic>/model/lift_drag_demo_model/forces/lift_drag/blade2</topic>
+        </visualize_forces>
       </plugin>
 
       <plugin

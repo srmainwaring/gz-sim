@@ -42,10 +42,206 @@
 #include "gz/sim/components/ExternalWorldWrenchCmd.hh"
 #include "gz/sim/components/Pose.hh"
 
+/// \todo(srmainwaring) includes for ForcePublisher
+#include <gz/msgs/entity_wrench_map.pb.h>
+#include "gz/sim/components/EntityWrench.hh"
+
+namespace gz
+{
+namespace sim
+{
+class ForcePublisher
+{
+  /// \brief Constructor
+  public: ForcePublisher();
+
+  /// \brief Constructor
+  public: ForcePublisher(sim::Entity _entity);
+
+  /// \brief Set the entity
+  void SetEntity(sim::Entity _entity);
+
+  // Initialize the system
+  public: void Load(
+      const EntityComponentManager &_ecm,
+      const sdf::ElementPtr &_sdf);
+
+  public: void PublishWorldWrench(
+      const UpdateInfo &_info,
+      EntityComponentManager &_ecm,
+      const math::Vector3d &_force,
+      const math::Vector3d &_torque);
+
+  /// \brief Entity associated with this publisher.
+  sim::Entity entity{kNullEntity};
+
+  /// \todo(srmainwaring) - should be false by default.
+  /// \brief If true the forces are visualized in the GUI
+  public: bool visualize{true};
+
+  /// \brief Visualization label
+  public: std::string label = "LiftDrag";
+
+  /// \brief Update period calculated from <update_rate>
+  public: std::chrono::steady_clock::duration updatePeriod{0};
+
+  /// \brief Last update time
+  public: std::chrono::steady_clock::duration lastUpdateTime{0};
+
+  /// \brief The communication node
+  public: transport::Node node;
+
+  /// \brief The publisher
+  public: std::unique_ptr<transport::Node::Publisher> forcePub;
+
+  /// \brief The topic for published forces
+  public: std::string topic;
+};
+}  // namespace sim
+}  // namespace gz
+
 using namespace gz;
 using namespace sim;
 using namespace systems;
 
+//////////////////////////////////////////////////
+ForcePublisher::ForcePublisher() = default;
+
+//////////////////////////////////////////////////
+ForcePublisher::ForcePublisher(sim::Entity _entity)
+  : entity(_entity)
+{
+}
+
+//////////////////////////////////////////////////
+void ForcePublisher::SetEntity(sim::Entity _entity)
+{
+  this->entity = _entity;
+}
+
+//////////////////////////////////////////////////
+void ForcePublisher::Load(
+    const EntityComponentManager &_ecm,
+    const sdf::ElementPtr &_sdf)
+{
+  if (_sdf->HasElement("visualize"))
+  {
+    this->visualize = _sdf->Get<bool>("visualize");
+  }
+
+  if (_sdf->HasElement("label"))
+  {
+    this->label
+        .append(" ")
+        .append(_sdf->Get<std::string>("label"));
+  }
+
+  {
+    double rate(-1.0);
+    if (_sdf->HasElement("update_rate"))
+    {
+      rate = _sdf->Get<double>("update_rate");
+    }
+    std::chrono::duration<double> period{rate > 0.0 ? 1.0 / rate : 0.0};
+    this->updatePeriod = std::chrono::duration_cast<
+        std::chrono::steady_clock::duration>(period);
+  }
+
+  if (_sdf->HasElement("topic"))
+  {
+    this->topic = _sdf->Get<std::string>("topic");
+  }
+
+  if (!topic.empty())
+  {
+    this->forcePub = std::make_unique<transport::Node::Publisher>(
+        this->node.Advertise<msgs::EntityWrenchMap>(this->topic));
+  }
+}
+
+//////////////////////////////////////////////////
+void ForcePublisher::PublishWorldWrench(const UpdateInfo &_info,
+    EntityComponentManager &_ecm,
+    const math::Vector3d &_force,
+    const math::Vector3d &_torque)
+{
+  auto elapsed = _info.simTime - this->lastUpdateTime;
+  if (!this->visualize || elapsed < this->updatePeriod)
+    return;
+
+  this->lastUpdateTime = _info.simTime;
+
+  // Enable required components.
+  enableComponent<components::Name>(_ecm, this->entity, true);
+  enableComponent<components::WorldPose>(_ecm, this->entity, true);
+  enableComponent<components::EntityWrenchMap>(_ecm, this->entity, true);
+
+  auto entityWrenchMapComp =
+      _ecm.Component<components::EntityWrenchMap>(this->entity);
+  if (!entityWrenchMapComp)
+  {
+    static bool informed{false};
+    if (!informed)
+    {
+      gzerr << "Failed to retrieve EntityWrenchMap component for link ["
+            << this->entity << "] from [" << this->label << "]\n";
+    }
+    return;
+  }
+
+  // Populate data
+  msgs::EntityWrench msg;
+
+  // Set label
+  {
+    auto data = msg.mutable_header()->add_data();
+    data->set_key("label");
+    data->add_value(this->label);
+  }
+
+  // Set name
+  {
+    auto data = msg.mutable_header()->add_data();
+    data->set_key("name");
+    auto name =  _ecm.ComponentData<components::Name>(this->entity);
+    if (name.has_value())
+    {
+      data->add_value(name.value());
+    }
+  }
+
+  // Set entity
+  msg.mutable_entity()->set_id(this->entity);
+
+  // Set wrench
+  msgs::Set(msg.mutable_wrench()->mutable_force(), _force);
+  msgs::Set(msg.mutable_wrench()->mutable_torque(), _torque);
+
+  // Update map with wrench
+  auto& data = entityWrenchMapComp->Data();
+  (*data.mutable_wrenches())[this->label] = msg;
+
+  _ecm.SetChanged(this->entity, components::EntityWrenchMap::typeId,
+      ComponentState::OneTimeChange);
+
+  // {
+  //   gzdbg << "Publishing entity wrench map for link ["
+  //         << this->entity << "]\n"
+  //         << "Size: "
+  //         << entityWrenchMapComp->Data().wrenches().size() << "\n"
+  //         << "Label: " << this->label << "\n"
+  //         << entityWrenchMapComp->Data().DebugString() << "\n";
+  // }
+
+  // Publish to transport (if we have a topic)
+  if (this->forcePub)
+  {
+    this->forcePub->Publish(entityWrenchMapComp->Data());
+  }
+}
+
+//////////////////////////////////////////////////
+//////////////////////////////////////////////////
 class gz::sim::systems::LiftDragPrivate
 {
   // Initialize the system
@@ -138,17 +334,8 @@ class gz::sim::systems::LiftDragPrivate
   /// \brief Initialization flag
   public: bool initialized{false};
 
-  /// \brief If true the forces are visualized in the GUI
-  public: bool visualize{false};
-
-  /// \brief Visualization label
-  public: std::string visualizeLabel = "LiftDrag";
-
-  /// \brief Visualization update period calculated from <vizualize_rate>
-  public: std::chrono::steady_clock::duration visualizePeriod{0};
-
-  /// \brief Last visualization update time
-  public: std::chrono::steady_clock::duration lastVisualizeTime{0};
+  /// \brief Force publisher for visualization / debugging.
+  public: ForcePublisher forcePublisher;
 };
 
 //////////////////////////////////////////////////
@@ -250,27 +437,10 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
   }
 
   // visualization
-  if (_sdf->HasElement("visualize"))
+  if (_sdf->HasElement("visualize_forces"))
   {
-    this->visualize = _sdf->Get<bool>("visualize");
-  }
-
-  if (_sdf->HasElement("visualize_label"))
-  {
-    this->visualizeLabel
-        .append(" ")
-        .append(_sdf->Get<std::string>("visualize_label"));
-  }
-
-  {
-    double rate(10.0);
-    if (_sdf->HasElement("visualize_rate"))
-    {
-      rate = _sdf->Get<double>("visualize_rate");
-    }
-    std::chrono::duration<double> period{rate > 0.0 ? 1.0 / rate : 0.0};
-    this->visualizePeriod = std::chrono::duration_cast<
-        std::chrono::steady_clock::duration>(period);
+    sdf::ElementPtr elem = _sdf->GetElement("visualize_forces");
+    forcePublisher.Load(_ecm, elem);
   }
 
   // If we reached here, we have a valid configuration
@@ -506,15 +676,11 @@ void LiftDragPrivate::Update(const UpdateInfo &_info,
   const auto totalTorque = torque + cpWorld.Cross(force);
   Link link(this->linkEntity);
 
-  // Throttle visualize update rate
-  auto elapsed = _info.simTime - this->lastVisualizeTime;
-  if (this->visualize && elapsed >= this->visualizePeriod)
-  {
-    this->lastVisualizeTime = _info.simTime;
-    link.SetVisualizationLabel(this->visualizeLabel);
-  }
- 
   link.AddWorldWrench(_ecm, force, totalTorque);
+
+  // Publish forces for visualization / debugging
+  forcePublisher.SetEntity(this->linkEntity);
+  forcePublisher.PublishWorldWrench(_info, _ecm, force, totalTorque);
 
   // Debug
   // auto linkName = _ecm.Component<components::Name>(this->linkEntity)->Data();
