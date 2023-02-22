@@ -63,6 +63,9 @@ namespace systems
   ///               stall.
   /// control_joint_name: Name of joint that actuates a control surface for this
   ///                     lifting body (Optional)
+
+  /// \todo(srmainwaring) - add visualization elements
+
   class LiftDrag
       : public System,
         public ISystemConfigure,

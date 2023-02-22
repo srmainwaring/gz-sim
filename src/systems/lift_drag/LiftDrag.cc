@@ -18,6 +18,7 @@
 #include "LiftDrag.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -54,7 +55,7 @@ class gz::sim::systems::LiftDragPrivate
   /// \brief Compute lift and drag forces and update the corresponding
   /// components
   /// \param[in] _ecm Immutable reference to the EntityComponentManager
-  public: void Update(EntityComponentManager &_ecm);
+  public: void Update(const UpdateInfo &_info, EntityComponentManager &_ecm);
 
   /// \brief Model interface
   public: Model model{kNullEntity};
@@ -136,6 +137,18 @@ class gz::sim::systems::LiftDragPrivate
 
   /// \brief Initialization flag
   public: bool initialized{false};
+
+  /// \brief If true the forces are visualized in the GUI
+  public: bool visualize{false};
+
+  /// \brief Visualization label
+  public: std::string visualizeLabel = "LiftDrag";
+
+  /// \brief Visualization update period calculated from <vizualize_rate>
+  public: std::chrono::steady_clock::duration visualizePeriod{0};
+
+  /// \brief Last visualization update time
+  public: std::chrono::steady_clock::duration lastVisualizeTime{0};
 };
 
 //////////////////////////////////////////////////
@@ -206,7 +219,6 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
     return;
   }
 
-
   if (_sdf->HasElement("control_joint_name"))
   {
     auto controlJointName = _sdf->Get<std::string>("control_joint_name");
@@ -237,6 +249,30 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
     }
   }
 
+  // visualization
+  if (_sdf->HasElement("visualize"))
+  {
+    this->visualize = _sdf->Get<bool>("visualize");
+  }
+
+  if (_sdf->HasElement("visualize_label"))
+  {
+    this->visualizeLabel
+        .append(" ")
+        .append(_sdf->Get<std::string>("visualize_label"));
+  }
+
+  {
+    double rate(10.0);
+    if (_sdf->HasElement("visualize_rate"))
+    {
+      rate = _sdf->Get<double>("visualize_rate");
+    }
+    std::chrono::duration<double> period{rate > 0.0 ? 1.0 / rate : 0.0};
+    this->visualizePeriod = std::chrono::duration_cast<
+        std::chrono::steady_clock::duration>(period);
+  }
+
   // If we reached here, we have a valid configuration
   this->validConfig = true;
 }
@@ -248,7 +284,8 @@ LiftDrag::LiftDrag()
 }
 
 //////////////////////////////////////////////////
-void LiftDragPrivate::Update(EntityComponentManager &_ecm)
+void LiftDragPrivate::Update(const UpdateInfo &_info,
+    EntityComponentManager &_ecm)
 {
   GZ_PROFILE("LiftDragPrivate::Update");
   // get linear velocity at cp in world frame
@@ -468,7 +505,15 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
   // positions
   const auto totalTorque = torque + cpWorld.Cross(force);
   Link link(this->linkEntity);
-  link.SetVisualizationLabel("LiftDrag");
+
+  // Throttle visualize update rate
+  auto elapsed = _info.simTime - this->lastVisualizeTime;
+  if (this->visualize && elapsed >= this->visualizePeriod)
+  {
+    this->lastVisualizeTime = _info.simTime;
+    link.SetVisualizationLabel(this->visualizeLabel);
+  }
+ 
   link.AddWorldWrench(_ecm, force, totalTorque);
 
   // Debug
@@ -554,7 +599,7 @@ void LiftDrag::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   // above
   if (this->dataPtr->initialized && this->dataPtr->validConfig)
   {
-    this->dataPtr->Update(_ecm);
+    this->dataPtr->Update(_info, _ecm);
   }
 }
 
