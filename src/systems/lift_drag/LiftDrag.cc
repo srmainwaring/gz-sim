@@ -18,6 +18,7 @@
 #include "LiftDrag.hh"
 
 #include <algorithm>
+#include <chrono>
 #include <string>
 #include <vector>
 #include <cmath>
@@ -43,10 +44,270 @@
 #include "gz/sim/components/Pose.hh"
 #include "gz/sim/components/Wind.hh"
 
+/// \todo(srmainwaring) includes for ForcePublisher
+#include <gz/math/Angle.hh>
+#include <gz/msgs/Utility.hh>
+#include <gz/msgs/entity_wrench_map.pb.h>
+#include "gz/sim/components/EntityWrench.hh"
+
+namespace gz
+{
+namespace sim
+{
+class ForcePublisher
+{
+  /// \brief Constructor
+  public: ForcePublisher();
+
+  /// \brief Constructor
+  public: ForcePublisher(const std::string &_label);
+
+  /// \brief Constructor
+  public: ForcePublisher(sim::Entity _entity, const std::string &_label);
+
+  /// \brief Set the entity
+  void SetEntity(sim::Entity _entity);
+
+  // Initialize the system
+  public: void Load(
+      const EntityComponentManager &_ecm,
+      const sdf::ElementPtr &_sdf);
+
+  public: void PublishWorldWrench(
+      const UpdateInfo &_info,
+      EntityComponentManager &_ecm,
+      const math::Vector3d &_force,
+      const math::Vector3d &_torque);
+
+  /// \brief Entity associated with this publisher.
+  sim::Entity entity{kNullEntity};
+
+  /// \todo(srmainwaring) - should be false by default.
+  /// \brief If true the forces are visualized in the GUI
+  public: bool visualize{true};
+
+  /// \brief Visualization label
+  public: std::string label = "Force";
+
+  /// \brief Update period calculated from <update_rate>
+  public: std::chrono::steady_clock::duration updatePeriod{0};
+
+  /// \brief Last update time
+  public: std::chrono::steady_clock::duration lastUpdateTime{0};
+
+  /// \brief The communication node
+  public: transport::Node node;
+
+  /// \brief The publisher
+  public: std::unique_ptr<transport::Node::Publisher> forcePub;
+
+  /// \brief The topic for published forces
+  public: std::string topic;
+
+  public: gz::msgs::EntityWrenchMap entityWrenchMap;
+};
+}  // namespace sim
+}  // namespace gz
+
 using namespace gz;
 using namespace sim;
 using namespace systems;
 
+//////////////////////////////////////////////////
+ForcePublisher::ForcePublisher() = default;
+
+//////////////////////////////////////////////////
+ForcePublisher::ForcePublisher(const std::string &_label) :
+  label(_label)
+{
+}
+
+//////////////////////////////////////////////////
+ForcePublisher::ForcePublisher(
+    sim::Entity _entity, const std::string &_label) :
+  entity(_entity),
+  label(_label)
+{
+}
+
+//////////////////////////////////////////////////
+void ForcePublisher::SetEntity(sim::Entity _entity)
+{
+  this->entity = _entity;
+}
+
+//////////////////////////////////////////////////
+void ForcePublisher::Load(
+    const EntityComponentManager &_ecm,
+    const sdf::ElementPtr &_sdf)
+{
+  if (_sdf->HasElement("visualize"))
+  {
+    this->visualize = _sdf->Get<bool>("visualize");
+  }
+
+  if (_sdf->HasElement("label"))
+  {
+    this->label
+        .append(" ")
+        .append(_sdf->Get<std::string>("label"));
+  }
+
+  {
+    double rate(-1.0);
+    if (_sdf->HasElement("update_rate"))
+    {
+      rate = _sdf->Get<double>("update_rate");
+    }
+    std::chrono::duration<double> period{rate > 0.0 ? 1.0 / rate : 0.0};
+    this->updatePeriod = std::chrono::duration_cast<
+        std::chrono::steady_clock::duration>(period);
+  }
+
+  if (_sdf->HasElement("topic"))
+  {
+    this->topic = _sdf->Get<std::string>("topic");
+  }
+
+  if (!topic.empty())
+  {
+    this->forcePub = std::make_unique<transport::Node::Publisher>(
+        this->node.Advertise<msgs::EntityWrenchMap>(this->topic));
+  }
+}
+
+//////////////////////////////////////////////////
+void ForcePublisher::PublishWorldWrench(const UpdateInfo &_info,
+    EntityComponentManager &_ecm,
+    const math::Vector3d &_force,
+    const math::Vector3d &_torque)
+{
+  //! @todo not efficient to retrieve this here as well...
+  const auto worldPoseComp =
+      _ecm.Component<components::WorldPose>(this->entity);
+  if (!worldPoseComp)
+  {
+    return;
+  }
+  const auto &worldPose = worldPoseComp->Data();
+
+  auto elapsed = _info.simTime - this->lastUpdateTime;
+  if (!this->visualize || elapsed < this->updatePeriod)
+    return;
+
+  this->lastUpdateTime = _info.simTime;
+
+  // Enable required components.
+  enableComponent<components::Name>(_ecm, this->entity, true);
+  enableComponent<components::WorldPose>(_ecm, this->entity, true);
+  enableComponent<components::EntityWrenchMap>(_ecm, this->entity, true);
+
+  auto entityWrenchMapComp =
+      _ecm.Component<components::EntityWrenchMap>(this->entity);
+  if (!entityWrenchMapComp)
+  {
+    static bool informed{false};
+    if (!informed)
+    {
+      gzerr << "Failed to retrieve EntityWrenchMap component for link ["
+            << this->entity << "] from [" << this->label << "]\n";
+    }
+    return;
+  }
+
+  // Populate data
+  msgs::EntityWrench msg;
+
+  // Set time stamp
+  {
+    *msg.mutable_header()->mutable_stamp() = msgs::Convert(_info.simTime);
+  }
+
+  // Set label
+  {
+    auto data = msg.mutable_header()->add_data();
+    data->set_key("label");
+    data->add_value(this->label);
+  }
+
+  // Set name
+  {
+    auto data = msg.mutable_header()->add_data();
+    data->set_key("name");
+    auto name =  _ecm.ComponentData<components::Name>(this->entity);
+    if (name.has_value())
+    {
+      data->add_value(name.value());
+    }
+  }
+
+  // Set entity
+  msg.mutable_entity()->set_id(this->entity);
+
+  // Set wrench
+  msgs::Set(msg.mutable_wrench()->mutable_force(), _force);
+  msgs::Set(msg.mutable_wrench()->mutable_torque(), _torque);
+
+  // Set the pose
+  msgs::Set(msg.mutable_pose()->mutable_position(), worldPose.Pos());
+  msgs::Set(msg.mutable_pose()->mutable_orientation(), worldPose.Rot());
+
+  //! @todo mutable accessor is deprecated
+  // Update entity wrench map data.
+  this->entityWrenchMap = entityWrenchMapComp->Data();
+
+  // Remove any messages with timestamp less than the current stamp.
+  //! @todo this appears redundant now, and seems to be causing a
+  //!       segmentation fault if all  the elements are erased?
+  for (auto iter = this->entityWrenchMap.mutable_wrenches()->begin();
+       iter != this->entityWrenchMap.mutable_wrenches()->end(); )
+  {
+    // auto msgStamp = msgs::Convert(iter->second.header().stamp());
+    // if (msgStamp <  _info.simTime)
+    // {
+    //   this->entityWrenchMap.mutable_wrenches()->erase(iter);
+    // }
+    // else
+    {
+      ++iter;
+    }
+  }
+
+  // Update time stamp
+  // gzdbg << "Update time stamp" << std::endl;
+  *this->entityWrenchMap.mutable_header()->mutable_stamp()
+      = msgs::Convert(_info.simTime);
+ 
+  // Update map with wrench
+  // gzdbg << "Update map with wrench" << std::endl;
+  (*this->entityWrenchMap.mutable_wrenches())[this->label] = msg;
+
+  // gzdbg << "_ecm.SetChanged" << std::endl;
+  entityWrenchMapComp->SetData(this->entityWrenchMap,
+      CompareData<components::EntityWrenchMap::Type>);
+
+  _ecm.SetChanged(this->entity, components::EntityWrenchMap::typeId,
+      ComponentState::OneTimeChange);
+
+  // {
+  //   gzdbg << "Publishing entity wrench map for link ["
+  //         << this->entity << "]\n"
+  //         << "Size: "
+  //         << entityWrenchMapComp->Data().wrenches().size() << "\n"
+  //         << "Label: " << this->label << "\n"
+  //         << entityWrenchMapComp->Data().DebugString() << "\n";
+  // }
+
+  // Publish to transport (if we have a topic)
+  // gzdbg << "Publish to transport" << std::endl;
+  if (this->forcePub)
+  {
+    this->forcePub->Publish(this->entityWrenchMap);
+  }
+}
+
+//////////////////////////////////////////////////
+//////////////////////////////////////////////////
 class gz::sim::systems::LiftDragPrivate
 {
   // Initialize the system
@@ -56,7 +317,7 @@ class gz::sim::systems::LiftDragPrivate
   /// \brief Compute lift and drag forces and update the corresponding
   /// components
   /// \param[in] _ecm Immutable reference to the EntityComponentManager
-  public: void Update(EntityComponentManager &_ecm);
+  public: void Update(const UpdateInfo &_info, EntityComponentManager &_ecm);
 
   /// \brief Model interface
   public: Model model{kNullEntity};
@@ -142,6 +403,12 @@ class gz::sim::systems::LiftDragPrivate
 
   /// \brief Initialization flag
   public: bool initialized{false};
+
+  /// \brief Lift force publisher for visualization / debugging.
+  public: ForcePublisher liftPublisher = ForcePublisher("Lift");
+
+  /// \brief Drag force publisher for visualization / debugging.
+  public: ForcePublisher dragPublisher = ForcePublisher("Drag");
 };
 
 //////////////////////////////////////////////////
@@ -243,6 +510,17 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
     }
   }
 
+  // visualization
+  if (_sdf->HasElement("visualize_forces"))
+  {
+    sdf::ElementPtr elem = _sdf->GetElement("visualize_forces");
+    liftPublisher.label = "Lift";
+    liftPublisher.Load(_ecm, elem);
+
+    dragPublisher.label = "Drag";
+    dragPublisher.Load(_ecm, elem);
+  }
+
   // If we reached here, we have a valid configuration
   this->validConfig = true;
 }
@@ -254,7 +532,8 @@ LiftDrag::LiftDrag()
 }
 
 //////////////////////////////////////////////////
-void LiftDragPrivate::Update(EntityComponentManager &_ecm)
+void LiftDragPrivate::Update(const UpdateInfo &_info,
+    EntityComponentManager &_ecm)
 {
   GZ_PROFILE("LiftDragPrivate::Update");
   // get linear velocity at cp in world frame
@@ -499,32 +778,54 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
   // positions
   const auto totalTorque = torque + cpWorld.Cross(force);
   Link link(this->linkEntity);
-  link.SetVisualizationLabel("LiftDrag");
+
   link.AddWorldWrench(_ecm, force, totalTorque);
 
+  // Publish forces for visualization / debugging
+  liftPublisher.SetEntity(this->linkEntity);
+  liftPublisher.PublishWorldWrench(_info, _ecm, lift, cpWorld.Cross(lift));
+
+  dragPublisher.SetEntity(this->linkEntity);
+  dragPublisher.PublishWorldWrench(_info, _ecm, drag, cpWorld.Cross(drag));
+
   // Debug
-  // auto linkName = _ecm.Component<components::Name>(this->linkEntity)->Data();
-  // gzdbg << "=============================\n";
-  // gzdbg << "Link: [" << linkName << "] pose: [" << pose
-  //        << "] dynamic pressure: [" << q << "]\n";
-  // gzdbg << "spd: [" << vel.Length() << "] vel: [" << vel << "]\n";
-  // gzdbg << "LD plane spd: [" << velInLDPlane.Length() << "] vel : ["
-  //        << velInLDPlane << "]\n";
-  // gzdbg << "forward (inertial): " << forwardI << "\n";
-  // gzdbg << "upward (inertial): " << upwardI << "\n";
-  // gzdbg << "q: " << q << "\n";
-  // gzdbg << "cl: " << cl << "\n";
-  // gzdbg << "lift dir (inertial): " << liftI << "\n";
-  // gzdbg << "Span direction (normal to LD plane): " << spanwiseI << "\n";
-  // gzdbg << "sweep: " << sweep << "\n";
-  // gzdbg << "alpha: " << alpha << "\n";
-  // gzdbg << "lift: " << lift << "\n";
-  // gzdbg << "drag: " << drag << " cd: " << cd << " cda: "
-  //        << this->cda << "\n";
-  // gzdbg << "moment: " << moment << "\n";
-  // gzdbg << "force: " << force << "\n";
-  // gzdbg << "torque: " << torque << "\n";
-  // gzdbg << "totalTorque: " << totalTorque << "\n";
+  {
+    const auto dragI = drag.Normalize();
+    const auto angFwdToDrag = math::Angle(std::acos(dragI.Dot(forwardI)));
+    const auto angFwdToVel = math::Angle(std::acos(velI.Dot(forwardI)));
+
+    auto linkName = _ecm.Component<components::Name>(this->linkEntity)->Data();
+    gzdbg << "=============================\n";
+    gzdbg << "link: [" << linkName << "]\n";
+    gzdbg << "pose.pos: [" << pose.Pos() << "]\n";
+    gzdbg << "pose.rot: [" << pose.Rot() << "]\n";
+    gzdbg << "dynamic pressure: [" << q << "]\n";
+    gzdbg << "spd: [" << vel.Length() << "]\n";
+    gzdbg << "vel: [" << vel << "]\n";
+    gzdbg << "spdInLDPlane: [" << velInLDPlane.Length() << "]\n";
+    gzdbg << "velInLDPlane: [" << velInLDPlane << "]\n";
+    gzdbg << "forwardI: " << forwardI << "\n";
+    gzdbg << "upwardI: " << upwardI << "\n";
+    gzdbg << "q: " << q << "\n";
+    gzdbg << "cl: " << cl << "\n";
+    gzdbg << "velI: [" << velI << "]\n";
+    gzdbg << "liftI: " << liftI << "\n";
+    gzdbg << "dragI: " << dragI << "\n";
+    gzdbg << "spanwiseI: " << spanwiseI << "\n";
+    gzdbg << "sweep: " << sweep << "\n";
+    gzdbg << "alpha: " << alpha << "\n";
+    gzdbg << "lift: " << lift << "\n";
+    gzdbg << "drag: " << drag << "\n";
+    gzdbg << "cd: " << cd << "\n";
+    gzdbg << "cda: " << this->cda << "\n";
+    gzdbg << "moment: " << moment << "\n";
+    gzdbg << "force: " << force << "\n";
+    gzdbg << "torque: " << torque << "\n";
+    gzdbg << "totalTorque: " << totalTorque << "\n";
+
+    gzdbg << "angFwdToDrag: " << angFwdToDrag.Degree() << " (deg)\n";
+    gzdbg << "angFwdToVel: " << angFwdToVel.Degree() << " (deg)\n";
+  }
 }
 
 //////////////////////////////////////////////////
@@ -584,7 +885,7 @@ void LiftDrag::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   // above
   if (this->dataPtr->initialized && this->dataPtr->validConfig)
   {
-    this->dataPtr->Update(_ecm);
+    this->dataPtr->Update(_info, _ecm);
   }
 }
 
