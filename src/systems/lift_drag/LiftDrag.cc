@@ -57,7 +57,10 @@ class ForcePublisher
   public: ForcePublisher();
 
   /// \brief Constructor
-  public: ForcePublisher(sim::Entity _entity);
+  public: ForcePublisher(const std::string &_label);
+
+  /// \brief Constructor
+  public: ForcePublisher(sim::Entity _entity, const std::string &_label);
 
   /// \brief Set the entity
   void SetEntity(sim::Entity _entity);
@@ -81,7 +84,7 @@ class ForcePublisher
   public: bool visualize{true};
 
   /// \brief Visualization label
-  public: std::string label = "LiftDrag";
+  public: std::string label = "Force";
 
   /// \brief Update period calculated from <update_rate>
   public: std::chrono::steady_clock::duration updatePeriod{0};
@@ -109,8 +112,16 @@ using namespace systems;
 ForcePublisher::ForcePublisher() = default;
 
 //////////////////////////////////////////////////
-ForcePublisher::ForcePublisher(sim::Entity _entity)
-  : entity(_entity)
+ForcePublisher::ForcePublisher(const std::string &_label) :
+  label(_label)
+{
+}
+
+//////////////////////////////////////////////////
+ForcePublisher::ForcePublisher(
+    sim::Entity _entity, const std::string &_label) :
+  entity(_entity),
+  label(_label)
 {
 }
 
@@ -357,8 +368,11 @@ class gz::sim::systems::LiftDragPrivate
   /// \brief Initialization flag
   public: bool initialized{false};
 
-  /// \brief Force publisher for visualization / debugging.
-  public: ForcePublisher forcePublisher;
+  /// \brief Lift force publisher for visualization / debugging.
+  public: ForcePublisher liftPublisher = ForcePublisher("Lift");
+
+  /// \brief Drag force publisher for visualization / debugging.
+  public: ForcePublisher dragPublisher = ForcePublisher("Drag");
 };
 
 //////////////////////////////////////////////////
@@ -463,7 +477,11 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
   if (_sdf->HasElement("visualize_forces"))
   {
     sdf::ElementPtr elem = _sdf->GetElement("visualize_forces");
-    forcePublisher.Load(_ecm, elem);
+    liftPublisher.label = "Lift";
+    liftPublisher.Load(_ecm, elem);
+
+    dragPublisher.label = "Drag";
+    dragPublisher.Load(_ecm, elem);
   }
 
   // If we reached here, we have a valid configuration
@@ -702,8 +720,11 @@ void LiftDragPrivate::Update(const UpdateInfo &_info,
   link.AddWorldWrench(_ecm, force, totalTorque);
 
   // Publish forces for visualization / debugging
-  forcePublisher.SetEntity(this->linkEntity);
-  forcePublisher.PublishWorldWrench(_info, _ecm, force, totalTorque);
+  liftPublisher.SetEntity(this->linkEntity);
+  liftPublisher.PublishWorldWrench(_info, _ecm, lift, cpWorld.Cross(lift));
+
+  dragPublisher.SetEntity(this->linkEntity);
+  dragPublisher.PublishWorldWrench(_info, _ecm, drag, cpWorld.Cross(drag));
 
   // Debug
   // auto linkName = _ecm.Component<components::Name>(this->linkEntity)->Data();
