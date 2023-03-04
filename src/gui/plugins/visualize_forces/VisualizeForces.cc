@@ -81,7 +81,11 @@ class VisualizeForcesPrivate
 
   /// \brief Visuals for each force marker.
   public: std::unordered_map<
-      std::string, rendering::ArrowVisualPtr> visuals;
+      std::string, rendering::ArrowVisualPtr> forceVisuals;
+
+  /// \brief Visuals for each torque marker.
+  public: std::unordered_map<
+      std::string, rendering::ArrowVisualPtr> torqueVisuals;
 
   /// \brief Set the scale. A scale of 1 => force of 1N has a marker length 1m.
   public: double scale{1.0};
@@ -106,10 +110,15 @@ class VisualizeForcesPrivate
   /// \brief Render force visuals - runs on render thread.
   public: void OnRender();
 
-  public: void AddVisual(const std::string &_ns,
+  public: void AddForceVisual(const std::string &_ns,
       const math::Color &_color);
 
-  public: void RemoveVisual(const std::string &_ns);
+  public: void RemoveForceVisual(const std::string &_ns);
+
+  public: void AddTorqueVisual(const std::string &_ns,
+      const math::Color &_color);
+
+  public: void RemoveTorqueVisual(const std::string &_ns);
 
   public: void ClearVisuals();
 };
@@ -209,20 +218,31 @@ void VisualizeForcesPrivate::OnRender()
       if (this->onScreenMarkers.count(ns))
       {
         this->onScreenMarkers.erase(ns);
-        this->RemoveVisual(ns);
+        this->RemoveForceVisual(ns);
+        this->RemoveTorqueVisual(ns);
       }
       continue;
     }
     auto force = msgs::Convert(wrenchMsg.wrench().force());
+    auto torque = msgs::Convert(wrenchMsg.wrench().torque());
 
     this->onScreenMarkers.insert(ns);
-    if (this->visuals.find(ns) == this->visuals.end())
+    if (this->forceVisuals.find(ns) == this->forceVisuals.end())
     {
-      gzdbg << "Adding arrow visual [" << ns << "]\n"
+      gzdbg << "Adding force visual [" << ns << "]\n"
             << "Color   [" << color.value() << "]\n"
             << "Thread  [" << QThread::currentThread() << "]\n";
 
-      this->AddVisual(ns, color.value());
+      this->AddForceVisual(ns, color.value());
+    }
+
+    if (this->torqueVisuals.find(ns) == this->torqueVisuals.end())
+    {
+      gzdbg << "Adding torque visual [" << ns << "]\n"
+            << "Color   [" << color.value() << "]\n"
+            << "Thread  [" << QThread::currentThread() << "]\n";
+
+      this->AddTorqueVisual(ns, color.value());
     }
 
     if (std::abs(force.Length()) > 1.0E-5)
@@ -230,10 +250,11 @@ void VisualizeForcesPrivate::OnRender()
       math::Quaterniond quat;
       quat.SetFrom2Axes(math::Vector3d::UnitZ, force.Normalized());
       math::Pose3d rotation(math::Vector3d::Zero, quat);
-      math::Pose3d forcePose(worldPose.Pos(), math::Quaterniond());
+      math::Pose3d linkPose(worldPose.Pos(), math::Quaterniond());
+      math::Pose3d forcePose = linkPose * rotation;
 
-      auto visual = this->visuals[ns];
-      visual->SetWorldPose(forcePose * rotation);
+      auto visual = this->forceVisuals[ns];
+      visual->SetWorldPose(forcePose);
       visual->SetLocalScale(1.0, 1.0, force.Length() * this->scale);
 
       // gzdbg << "Wrench visual for entity ["
@@ -241,11 +262,24 @@ void VisualizeForcesPrivate::OnRender()
       //       << "Force     [" << force << "]\n"
       //       << "Position  [" << forcePose.Pos() << "]\n";
     }
+
+    if (std::abs(torque.Length()) > 1.0E-5)
+    {
+      math::Quaterniond quat;
+      quat.SetFrom2Axes(math::Vector3d::UnitZ, torque.Normalized());
+      math::Pose3d rotation(math::Vector3d::Zero, quat);
+      math::Pose3d linkPose(worldPose.Pos(), math::Quaterniond());
+      math::Pose3d torquePose = linkPose * rotation;
+
+      auto visual = this->torqueVisuals[ns];
+      visual->SetWorldPose(torquePose);
+      visual->SetLocalScale(1.0, 1.0, torque.Length() * this->scale);
+    }
   }
 }
 
 /////////////////////////////////////////////////
-void VisualizeForcesPrivate::AddVisual(
+void VisualizeForcesPrivate::AddForceVisual(
     const std::string &_ns, const math::Color &_color)
 {
   auto rootVisual = this->scene->RootVisual();
@@ -266,30 +300,72 @@ void VisualizeForcesPrivate::AddVisual(
   visual->ShowArrowRotation(false);
   visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
 
-  this->visuals[_ns] = visual;
-  rootVisual->AddChild(this->visuals[_ns]);
+  this->forceVisuals[_ns] = visual;
+  rootVisual->AddChild(this->forceVisuals[_ns]);
 }
 
 /////////////////////////////////////////////////
-void VisualizeForcesPrivate::RemoveVisual(const std::string &_ns)
+void VisualizeForcesPrivate::RemoveForceVisual(const std::string &_ns)
 {
-  if (this->visuals.find(_ns) != this->visuals.end())
+  if (this->forceVisuals.find(_ns) != this->forceVisuals.end())
   {
-    auto visual = this->visuals[_ns];
+    auto visual = this->forceVisuals[_ns];
     if (visual != nullptr && visual->HasParent())
     {
       visual->Parent()->RemoveChild(visual);
       this->scene->DestroyVisual(visual, true);
       visual.reset();
     }
-    this->visuals.erase(_ns);
+    this->forceVisuals.erase(_ns);
+  }
+}
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::AddTorqueVisual(
+    const std::string &_ns, const math::Color &_color)
+{
+  auto rootVisual = this->scene->RootVisual();
+
+  rendering::MaterialPtr mat = this->scene->CreateMaterial();
+  mat->SetAmbient(_color.R(), _color.G(), _color.B(), 1.0);
+  mat->SetDiffuse(_color.R(), _color.G(), _color.B(), 1.0);
+  mat->SetSpecular(0.5, 0.5, 0.5, 1.0);
+  mat->SetShininess(50);
+  mat->SetReflectivity(0);
+  mat->SetCastShadows(false);
+
+  auto visual = this->scene->CreateArrowVisual();
+  visual->SetMaterial(mat);
+
+  visual->ShowArrowHead(false);
+  visual->ShowArrowShaft(true);
+  visual->ShowArrowRotation(true);
+  visual->SetVisibilityFlags(GZ_VISIBILITY_GUI);
+
+  this->torqueVisuals[_ns] = visual;
+  rootVisual->AddChild(this->torqueVisuals[_ns]);
+}
+
+/////////////////////////////////////////////////
+void VisualizeForcesPrivate::RemoveTorqueVisual(const std::string &_ns)
+{
+  if (this->torqueVisuals.find(_ns) != this->torqueVisuals.end())
+  {
+    auto visual = this->torqueVisuals[_ns];
+    if (visual != nullptr && visual->HasParent())
+    {
+      visual->Parent()->RemoveChild(visual);
+      this->scene->DestroyVisual(visual, true);
+      visual.reset();
+    }
+    this->torqueVisuals.erase(_ns);
   }
 }
 
 /////////////////////////////////////////////////
 void VisualizeForcesPrivate::ClearVisuals()
 {
-  for (auto&& item : this->visuals)
+  for (auto&& item : this->forceVisuals)
   {
     auto visual = item.second;
     if (visual != nullptr && visual->HasParent())
@@ -298,7 +374,18 @@ void VisualizeForcesPrivate::ClearVisuals()
       this->scene->DestroyVisual(visual, true);
     }
   }
-  this->visuals.clear();
+  this->forceVisuals.clear();
+
+  for (auto&& item : this->torqueVisuals)
+  {
+    auto visual = item.second;
+    if (visual != nullptr && visual->HasParent())
+    {
+      visual->Parent()->RemoveChild(visual);
+      this->scene->DestroyVisual(visual, true);
+    }
+  }
+  this->torqueVisuals.clear();
 }
 
 /////////////////////////////////////////////////
