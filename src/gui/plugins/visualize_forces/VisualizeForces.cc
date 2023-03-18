@@ -238,11 +238,11 @@ void VisualizeForcesPrivate::OnRender()
 
     if (this->torqueVisuals.find(ns) == this->torqueVisuals.end())
     {
-      gzdbg << "Adding torque visual [" << ns << "]\n"
-            << "Color   [" << color.value() << "]\n"
-            << "Thread  [" << QThread::currentThread() << "]\n";
+      // gzdbg << "Adding torque visual [" << ns << "]\n"
+      //       << "Color   [" << color.value() << "]\n"
+      //       << "Thread  [" << QThread::currentThread() << "]\n";
 
-      this->AddTorqueVisual(ns, color.value());
+      // this->AddTorqueVisual(ns, color.value());
     }
 
     if (std::abs(force.Length()) > 1.0E-5)
@@ -271,9 +271,9 @@ void VisualizeForcesPrivate::OnRender()
       math::Pose3d linkPose(worldPose.Pos(), math::Quaterniond());
       math::Pose3d torquePose = linkPose * rotation;
 
-      auto visual = this->torqueVisuals[ns];
-      visual->SetWorldPose(torquePose);
-      visual->SetLocalScale(1.0, 1.0, torque.Length() * this->scale);
+      // auto visual = this->torqueVisuals[ns];
+      // visual->SetWorldPose(torquePose);
+      // visual->SetLocalScale(1.0, 1.0, torque.Length() * this->scale);
     }
   }
 }
