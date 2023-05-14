@@ -54,10 +54,10 @@ namespace gz
     class EventManager
     {
       /// \brief Constructor
-      public: EventManager() = default;
+      public: EventManager();
 
       /// \brief Destructor
-      public: ~EventManager() = default;
+      public: ~EventManager();
 
       /// \brief Add a connection to an event.
       /// \param[in] _subscriber A std::function callback function. The function

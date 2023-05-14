@@ -54,6 +54,7 @@ set (sources
   ComponentFactory.cc
   EntityComponentManager.cc
   EntityComponentManagerDiff.cc
+  EventManager.cc
   Joint.cc
   LevelManager.cc
   Light.cc
