@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Open Source Robotics Foundation
+ * Copyright (C) 2020-2023 Open Source Robotics Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 
 
 #include <gz/common/Event.hh>
+#include <gz/common/EventFactory.hh>
 
 #include "gz/sim/config.hh"
 
@@ -43,6 +44,7 @@ namespace gz
       /// \endcode
       using SceneUpdate = gz::common::EventT<void(void),
           struct SceneUpdateTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.SceneUpdate", SceneUpdate)
 
       /// \brief The pre render event is emitted before rendering updates.
       /// The event is emitted in the rendering thread so rendering
@@ -54,6 +56,7 @@ namespace gz
       /// \endcode
       using PreRender = gz::common::EventT<void(void),
           struct PreRenderTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.PreRender", PreRender)
 
       /// \brief The render event is emitted during rendering updates.
       /// The event is emitted in the rendering thread so rendering
@@ -65,6 +68,7 @@ namespace gz
       /// \endcode
       using Render = gz::common::EventT<void(void),
           struct RenderTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.Render", Render)
 
       /// \brief The post render event is emitted after rendering updates.
       /// The event is emitted in the rendering thread so rendering
@@ -76,6 +80,7 @@ namespace gz
       /// \endcode
       using PostRender = gz::common::EventT<void(void),
           struct PostRenderTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.PostRender", PostRender)
 
       /// \brief The render teardown event is emitted right before the
       /// rendering thread is torn down. The event is emitted in the
@@ -88,6 +93,7 @@ namespace gz
       /// \endcode
       using RenderTeardown = gz::common::EventT<void(void),
           struct RenderTeardownTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.RenderTeardown", RenderTeardown)
 
       /// \brief The force render event may be emitted outside the
       /// rendering thread to force rendering calls ie. to ensure
@@ -102,6 +108,7 @@ namespace gz
       /// \endcode
       using ForceRender = gz::common::EventT<void(void),
           struct ForceRenderTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.ForceRender", ForceRender)
       }
     }  // namespace events
   }  // namespace sim

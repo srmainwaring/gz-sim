@@ -27,6 +27,7 @@
 #include <gz/sim/EventManager.hh>
 
 #include <gz/common/Event.hh>
+#include <gz/common/EventFactory.hh>
 #include <gz/transport/Node.hh>
 
 #include "PeerInfo.hh"
@@ -41,12 +42,15 @@ namespace gz
     /// \brief PeerAdded fired when a peer announces itself or detected via
     /// heartbeat
     using PeerAdded = common::EventT<void(PeerInfo), struct PeerAddedTag>;
+    GZ_COMMON_REGISTER_EVENT("gz_sim.PeerAdded", PeerAdded)
 
     /// \brief PeerRemoved fired when a peer announces a disconnect.
     using PeerRemoved = common::EventT<void(PeerInfo), struct PeerRemovedTag>;
+    GZ_COMMON_REGISTER_EVENT("gz_sim.PeerRemoved", PeerRemoved)
 
     /// \brief PeerStale fired when a peer is detected as stale.
     using PeerStale = common::EventT<void(PeerInfo), struct PeerStaleTag>;
+    GZ_COMMON_REGISTER_EVENT("gz_sim.PeerStale", PeerStale)
 
     /// \brief The PeerTracker is used to track the state of multiple peers in
     /// a distributed simulation environment.

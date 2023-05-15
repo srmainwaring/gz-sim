@@ -20,6 +20,7 @@
 #include <optional>
 
 #include <gz/common/Event.hh>
+#include <gz/common/EventFactory.hh>
 
 #include <gz/physics/ContactProperties.hh>
 
@@ -57,6 +58,9 @@ namespace gz
             ContactSurfaceParams<Policy>& /* params */
         ),
         struct CollectContactSurfacePropertiesTag>;
+      GZ_COMMON_REGISTER_EVENT(
+          "gz_sim_events.CollectContactSurfaceProperties",
+          CollectContactSurfaceProperties)
       }
     }  // namespace events
   }  // namespace sim

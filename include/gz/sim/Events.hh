@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 Open Source Robotics Foundation
+ * Copyright (C) 2018-2023 Open Source Robotics Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include <sdf/Plugin.hh>
 
 #include <gz/common/Event.hh>
+#include <gz/common/EventFactory.hh>
 
 #include "gz/sim/config.hh"
 #include "gz/sim/Entity.hh"
@@ -44,6 +45,7 @@ namespace gz
       /// eventManager.Emit<gz::sim::events::Pause>(true);
       /// \endcode
       using Pause = gz::common::EventT<void(bool), struct PauseTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.Pause", Pause)
 
       /// \brief The stop event can be used to terminate simulation.
       /// Emit this signal to terminate an active simulation.
@@ -53,6 +55,7 @@ namespace gz
       /// eventManager.Emit<gz::sim::events::Stop>();
       /// \endcode
       using Stop = gz::common::EventT<void(void), struct StopTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.Stop", Stop)
 
       /// \brief Please use the LoadSdfPlugins event. The LoadPlugins event
       /// is deprecrated in Gazebo 7 (Garden). Also make sure to
@@ -68,6 +71,7 @@ namespace gz
       using LoadPlugins GZ_DEPRECATED(7) =
 #endif
           common::EventT<void(Entity, sdf::ElementPtr), struct LoadPluginsTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.LoadPlugins", LoadPlugins)
 
       /// \brief Event used to load plugins for an entity into simulation.
       /// Pass in the entity which will own the plugins, and an SDF element for
@@ -75,6 +79,7 @@ namespace gz
       /// Makre sure that you don't also connect to the LoadPlugins event.
       using LoadSdfPlugins = common::EventT<void(Entity, sdf::Plugins),
           struct LoadPluginsTag>;
+      GZ_COMMON_REGISTER_EVENT("gz_sim_events.LoadSdfPlugins", LoadSdfPlugins)
       }
     }  // namespace events
   }  // namespace sim
