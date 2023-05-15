@@ -69,14 +69,14 @@ namespace gz
               gz::common::ConnectionPtr
               Connect(const typename E::CallbackT &_subscriber)
               {
-                if (this->events.find(std::type_index(typeid(E))) ==
+                if (this->events.find(E::typeId) ==
                     this->events.end()) {
-                  this->events[std::type_index(typeid(E))] =
+                  this->events[E::typeId] =
                       std::make_unique<E>();
                 }
 
                 E *eventPtr = dynamic_cast<E *>(
-                    this->events[std::type_index(typeid(E))].get());
+                    this->events[E::typeId].get());
                 // All values in the map should be derived from Event,
                 // so this shouldn't be an issue, but it doesn't hurt to check.
                 if (eventPtr != nullptr)
@@ -97,7 +97,7 @@ namespace gz
       public: template <typename E, typename ... Args>
               void Emit(Args && ... _args)
               {
-                if (this->events.find(std::type_index(typeid(E))) ==
+                if (this->events.find(E::typeId) ==
                     this->events.end())
                 {
                   // If there are no events of type E in the map, create it.
@@ -105,13 +105,13 @@ namespace gz
                   //
                   // This is also needed to suppress unused function warnings
                   // for Events that are purely emitted, with no connections.
-                  this->events[std::type_index(typeid(E))] =
+                  this->events[E::typeId] =
                       std::make_unique<E>();
                   return;
                 }
 
                 E *eventPtr = dynamic_cast<E *>(
-                      this->events[std::type_index(typeid(E))].get());
+                      this->events[E::typeId].get());
                 // All values in the map should be derived from Event,
                 // so this shouldn't be an issue, but it doesn't hurt to check.
                 if (eventPtr != nullptr)
@@ -131,14 +131,14 @@ namespace gz
               unsigned int
               ConnectionCount()
               {
-                if (this->events.find(std::type_index(typeid(E))) ==
+                if (this->events.find(E::typeId) ==
                     this->events.end())
                 {
                   return 0u;
                 }
 
                 E *eventPtr = dynamic_cast<E *>(
-                    this->events[std::type_index(typeid(E))].get());
+                    this->events[E::typeId].get());
                 // All values in the map should be derived from Event,
                 // so this shouldn't be an issue, but it doesn't hurt to check.
                 if (eventPtr != nullptr)
@@ -154,7 +154,7 @@ namespace gz
               }
 
       /// \brief Container of used signals.
-      private: std::unordered_map<std::type_index,
+      private: std::unordered_map<common::EventTypeId,
                                   std::unique_ptr<gz::common::Event>> events;
     };
     }
