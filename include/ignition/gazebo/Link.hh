@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include <ignition/math/Matrix3.hh>
 #include <ignition/math/Pose3.hh>
 #include <ignition/math/Quaternion.hh>
 #include <ignition/math/Vector3.hh>
@@ -304,6 +305,11 @@ namespace ignition
       public: void AddWorldWrench(EntityComponentManager &_ecm,
                                  const math::Vector3d &_force,
                                  const math::Vector3d &_torque) const;
+
+      /// \brief Sets the visualization label used by the force visualization.
+      /// \param[in] _label The label used for force visualizations.
+      public: void SetVisualizationLabel(
+          const std::string &_label);
 
       /// \brief Pointer to private data.
       private: std::unique_ptr<LinkPrivate> dataPtr;

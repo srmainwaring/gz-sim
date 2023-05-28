@@ -14,24 +14,24 @@
  * limitations under the License.
  *
  */
-#ifndef GZ_SIM_COMPONENTS_ENTITYWRENCH_HH_
-#define GZ_SIM_COMPONENTS_ENTITYWRENCH_HH_
+#ifndef IGNITION_GAZEBO_COMPONENTS_ENTITYWRENCH_HH_
+#define IGNITION_GAZEBO_COMPONENTS_ENTITYWRENCH_HH_
 
 #include <string>
 #include <unordered_map>
 
-#include <gz/msgs/entity_wrench_map.pb.h>
-#include <gz/sim/components/Component.hh>
-#include <gz/sim/components/Factory.hh>
-#include <gz/sim/components/Serialization.hh>
-#include <gz/sim/config.hh>
+#include <ignition//msgs/entity_wrench_map.pb.h>
+#include <ignition/gazebo/components/Component.hh>
+#include <ignition/gazebo/components/Factory.hh>
+#include <ignition/gazebo/components/Serialization.hh>
+#include <ignition/gazebo/config.hh>
 
-namespace gz
+namespace ignition
 {
-namespace sim
+namespace gazebo
 {
 // Inline bracket to help doxygen filtering.
-inline namespace GZ_SIM_VERSION_NAMESPACE {
+inline namespace IGNITION_GAZEBO_VERSION_NAMESPACE {
 
 namespace components
 {
@@ -40,11 +40,11 @@ namespace components
   using EntityWrenchMap =
       Component<msgs::EntityWrenchMap, class EntityWrenchMapTag,
           serializers::MsgSerializer>;
-  GZ_SIM_REGISTER_COMPONENT("gz_sim_components.EntityWrenchMap",
-                            EntityWrenchMap)
+  IGN_GAZEBO_REGISTER_COMPONENT("ign_gazebo_components.EntityWrenchMap",
+                                EntityWrenchMap)
 }
 }
-}  // namespace sim
-}  // namespace gz
+}  // namespace gazebo
+}  // namespace ignition
 
-#endif  // GZ_SIM_COMPONENTS_ENTITYWRENCH_HH_
+#endif  // IGNITION_GAZEBO_COMPONENTS_ENTITYWRENCH_HH_
