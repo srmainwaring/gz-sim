@@ -53,11 +53,11 @@ Rectangle {
    */
   Component {
     id: writableNumber
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: writableSpin
       value: numberValue
-      minimumValue: -spinMax
-      maximumValue: spinMax
+      from: -spinMax
+      to: spinMax
       decimals: getDecimalsAdjustValue(writableSpin, numberValue)
     }
   }
