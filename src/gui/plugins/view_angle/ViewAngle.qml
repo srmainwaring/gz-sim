@@ -217,15 +217,15 @@ ColumnLayout {
       id: viewControlSensitivityLabel
       text: "View control sensitivity"
     }
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: viewControlSensitivitySpinBox
       Layout.fillWidth: true
       value: 1.0
-      maximumValue: 10.0
-      minimumValue: 0.01
+      to: 10.0
+      from: 0.01
       decimals: 2
       stepSize: 0.1
-      onEditingFinished:{
+      onValueModified:{
         ViewAngle.OnViewControlSensitivity(value)
       }
     }
@@ -293,17 +293,17 @@ ColumnLayout {
       Layout.column: 0
       leftPadding: 5
     }
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: nearClip
       Layout.fillWidth: true
       Layout.row: 0
       Layout.column: 1
       value: ViewAngle.camClipDist[0]
-      maximumValue: farClip.value
-      minimumValue: 0.000001
+      to: farClip.value
+      from: 0.000001
       decimals: 6
       stepSize: 0.01
-      onEditingFinished: ViewAngle.SetCamClipDist(nearClip.value, farClip.value)
+      onValueModified: ViewAngle.SetCamClipDist(nearClip.value, farClip.value)
     }
     Text {
       text: "Far (m)"
@@ -312,17 +312,17 @@ ColumnLayout {
       Layout.column: 2
       leftPadding: 5
     }
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: farClip
       Layout.fillWidth: true
       Layout.row: 0
       Layout.column: 3
       value: ViewAngle.camClipDist[1]
-      maximumValue: Number.MAX_VALUE
-      minimumValue: nearClip.value
+      to: Number.MAX_VALUE
+      from: nearClip.value
       decimals: 6
       stepSize: 0.01
-      onEditingFinished: ViewAngle.SetCamClipDist(nearClip.value, farClip.value)
+      onValueModified: ViewAngle.SetCamClipDist(nearClip.value, farClip.value)
     }
   }
 
@@ -347,17 +347,17 @@ ColumnLayout {
       Layout.column: 0
       leftPadding: 5
     }
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: horizontalFOV
       Layout.fillWidth: true
       Layout.row: 0
       Layout.column: 1
       value: ViewAngle.horizontalFOV
-      maximumValue: 3.14159
-      minimumValue: 0.000001
+      to: 3.14159
+      from: 0.000001
       decimals: 6
       stepSize: 0.01
-      onEditingFinished: ViewAngle.SetHorizontalFOV(horizontalFOV.value)
+      onValueModified: ViewAngle.SetHorizontalFOV(horizontalFOV.value)
     }
   }
 

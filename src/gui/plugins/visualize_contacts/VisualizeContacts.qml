@@ -60,7 +60,7 @@ GridLayout {
     text: "Radius (m)"
   }
 
-  GzSpinBox {
+  GzDoubleSpinBox {
     Layout.columnSpan: 2
     Layout.fillWidth: true
     id: radius
@@ -69,7 +69,7 @@ GridLayout {
     value: 0.10
     decimals: 2
     stepSize: 0.05
-    onEditingFinished: VisualizeContacts.UpdateRadius(radius.value)
+    onValueModified: VisualizeContacts.UpdateRadius(radius.value)
   }
 
   Text {
@@ -79,16 +79,16 @@ GridLayout {
     text: "Update period (ms)"
   }
 
-  GzSpinBox {
+  GzDoubleSpinBox {
     Layout.columnSpan: 2
     Layout.fillWidth: true
     id: updatePeriod
-    maximumValue: 2000
-    minimumValue: 10
+    to: 2000
+    from: 10
     value: 200
     decimals: 0
     stepSize: 50
-    onEditingFinished: VisualizeContacts.UpdatePeriod(updatePeriod.value)
+    onValueModified: VisualizeContacts.UpdatePeriod(updatePeriod.value)
   }
 
   // Bottom spacer

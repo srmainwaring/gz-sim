@@ -69,14 +69,14 @@ Rectangle {
       }
     }
 
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: spin
       value: spin.activeFocus ? joint.targetValue : model.value
-      minimumValue: model.min
-      maximumValue: model.max
+      from: model.min
+      to: model.max
       decimals: 2
       stepSize: 0.1
-      onEditingFinished: {
+      onValueModified: {
         joint.targetValue = spin.value
       }
     }

@@ -54,17 +54,17 @@ Rectangle {
    */
   Component {
     id: writableNumber
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: writableSpin
       value: writableSpin.activeFocus ? writableSpin.value : numberValue
-      minimumValue: minValue
-      maximumValue: maxValue
+      from: minValue
+      to: maxValue
       stepSize: stepValue
       decimals: {
         writableSpin.value = writableSpin.activeFocus ? writableSpin.value : numberValue
         stepSize == 1 ? 0 : componentInspectorEditor.getDecimals(writableSpin.width)
       }
-      onEditingFinished: {
+      onValueModified: {
         numberValue = writableSpin.value
         onChange(writableSpin.value)
       }

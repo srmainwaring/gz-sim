@@ -71,14 +71,14 @@ Rectangle {
 
   Component {
     id: writablePositiveNumber
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: writableSpin
       value: writableSpin.activeFocus ? writableSpin.value : numberValue
-      minimumValue: minPhysParam
-      maximumValue: maxPhysParam
+      from: minPhysParam
+      to: maxPhysParam
       decimals: 6
       stepSize: 0.001
-      onEditingFinished: {
+      onValueModified: {
         sendPhysics()
       }
     }

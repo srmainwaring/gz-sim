@@ -117,13 +117,13 @@ Rectangle {
   // Used to create rgba spin boxes
   Component {
     id: spinBoxMaterialColor
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: writableSpin
       value: writableSpin.activeFocus ? writableSpin.value : numberValue
-      minimumValue: 0
-      maximumValue: 255
+      from: 0
+      to: 255
       decimals: 0
-      onEditingFinished: {
+      onValueModified: {
         // sending empty params to not open color dialog
         sendMaterialColor("", Qt.rgba(0, 0, 0, 0))
       }

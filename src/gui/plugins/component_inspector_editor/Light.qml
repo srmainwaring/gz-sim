@@ -164,26 +164,26 @@ Rectangle {
 
   Component {
     id: spinZeroMax
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: writableSpin
       value: writableSpin.activeFocus ? writableSpin.value : numberValue
-      minimumValue: 0
-      maximumValue: Number.MAX_VALUE
+      from: 0
+      to: Number.MAX_VALUE
       decimals: 6
-      onEditingFinished: {
+      onValueModified: {
         sendLight()
       }
     }
   }
   Component {
     id: spinNoLimit
-    GzSpinBox {
+    GzDoubleSpinBox {
       id: writableSpin
       value: writableSpin.activeFocus ? writableSpin.value : numberValue
-      minimumValue: -Number.MAX_VALUE
-      maximumValue: Number.MAX_VALUE
+      from: -Number.MAX_VALUE
+      to: Number.MAX_VALUE
       decimals: 6
-      onEditingFinished: {
+      onValueModified: {
         sendLight()
       }
     }
