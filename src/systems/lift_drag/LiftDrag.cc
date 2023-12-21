@@ -88,6 +88,10 @@ class gz::sim::systems::LiftDragPrivate
   /// \brief Cm-alpha rate after stall
   public: double cmaStall = 0.0;
 
+  /// \brief How much Cm changes with a change in control
+  /// surface deflection angle
+  public: double cm_delta = 0.0;
+
   /// \brief air density
   /// at 25 deg C it's about 1.1839 kg/m^3
   /// At 20 °C and 101.325 kPa, dry air has a density of 1.2041 kg/m3.
@@ -156,6 +160,7 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
   this->area = _sdf->Get<double>("area", this->area).first;
   this->alpha0 = _sdf->Get<double>("a0", this->alpha0).first;
   this->cp = _sdf->Get<math::Vector3d>("cp", this->cp).first;
+  this->cm_delta = _sdf->Get<double>("cm_delta", this->cm_delta).first;
 
   // blade forward (-drag) direction in link frame
   this->forward =
@@ -435,9 +440,11 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
   else
     cm = this->cma * alpha * cosSweepAngle;
 
-  /// \todo(anyone): implement cm
-  /// for now, reset cm to zero, as cm needs testing
-  cm = 0.0;
+  // Take into account the effect of control surface deflection angle to cm
+  if (controlJointPosition && !controlJointPosition->Data().empty())
+  {
+    cm += this->cm_delta * controlJointPosition->Data()[0];
+  }
 
   // compute moment (torque) at cp
   // spanwiseI used to be momentDirection
