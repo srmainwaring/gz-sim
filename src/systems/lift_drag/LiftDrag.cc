@@ -207,7 +207,6 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
     return;
   }
 
-
   if (_sdf->HasElement("control_joint_name"))
   {
     auto controlJointName = _sdf->Get<std::string>("control_joint_name");
@@ -444,7 +443,6 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
   // spanwiseI used to be momentDirection
   math::Vector3d moment = cm * q * this->area * spanwiseI;
 
-
   // force and torque about cg in world frame
   math::Vector3d force = lift + drag;
   math::Vector3d torque = moment;
@@ -530,7 +528,6 @@ void LiftDrag::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
     // that all entities have been created when Configure is called
     this->dataPtr->Load(_ecm, this->dataPtr->sdfConfig);
     this->dataPtr->initialized = true;
-
 
     if (this->dataPtr->validConfig)
     {
