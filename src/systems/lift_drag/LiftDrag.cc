@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include <gz/common/Profiler.hh>
 #include <gz/plugin/Register.hh>
@@ -304,7 +305,7 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
       spanwiseI.Dot(velI), minRatio, maxRatio);
 
   // get cos from trig identity
-  const double cosSweepAngle = 1.0 - sinSweepAngle * sinSweepAngle;
+  double cosSweepAngle = sqrt(1.0 - sinSweepAngle * sinSweepAngle);
   double sweep = std::asin(sinSweepAngle);
 
   // truncate sweep to within +/-90 deg
