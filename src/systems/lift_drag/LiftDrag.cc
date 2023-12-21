@@ -336,7 +336,7 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
 
   // compute angle between upwardI and liftI
   // in general, given vectors a and b:
-  //   cos(theta) = a.Dot(b)/(a.Length()*b.Lenghth())
+  //   cos(theta) = a.Dot(b)/(a.Length()*b.Length())
   // given upwardI and liftI are both unit vectors, we can drop the denominator
   //   cos(theta) = a.Dot(b)
   const double cosAlpha =
