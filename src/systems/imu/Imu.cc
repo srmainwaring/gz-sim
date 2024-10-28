@@ -31,9 +31,11 @@
 #include <gz/sensors/SensorFactory.hh>
 #include <gz/sensors/ImuSensor.hh>
 
+
 #include "gz/sim/World.hh"
 #include "gz/sim/components/AngularVelocity.hh"
 #include "gz/sim/components/Imu.hh"
+#include <gz/sim/components/Inertial.hh>
 #include "gz/sim/components/Gravity.hh"
 #include "gz/sim/components/LinearAcceleration.hh"
 #include "gz/sim/components/Name.hh"
@@ -42,7 +44,10 @@
 #include "gz/sim/components/Sensor.hh"
 #include "gz/sim/components/World.hh"
 #include "gz/sim/EntityComponentManager.hh"
+#include <gz/sim/Link.hh>
+#include <gz/sim/Model.hh>
 #include "gz/sim/Util.hh"
+#include <gz/sim/World.hh>
 
 using namespace gz;
 using namespace sim;
@@ -94,6 +99,24 @@ class gz::sim::systems::ImuPrivate
   /// simulation.
   /// \param[in] _ecm Immutable reference to ECM.
   public: void RemoveImuEntities(const EntityComponentManager &_ecm);
+
+  // Custom Gravity
+
+  /// \brief World occupied by the parent model.
+  public: World world{kNullEntity};
+
+  /// \brief Model providing the source of gravity.
+  public: Model sourceModel{kNullEntity};
+
+  /// \brief Name of the gravity source model entity.
+  public: std::string sourceName;
+
+  /// \brief Power law exponent. Default is inverse square.
+  public: double gravity_expo{-2.0};
+
+  /// \brief Universal gravitational constant (N m^2 / kg^2).
+  public: static constexpr double G{6.67430E-11};
+
 };
 
 //////////////////////////////////////////////////
@@ -173,6 +196,25 @@ void Imu::PostUpdate(const UpdateInfo &_info,
   }
 
   this->dataPtr->RemoveImuEntities(_ecm);
+}
+
+//////////////////////////////////////////////////
+void Imu::Configure(
+    const Entity &/*_entity*/,
+    const std::shared_ptr<const sdf::Element> &_sdf,
+    EntityComponentManager &/*_ecm*/,
+    EventManager &)
+{
+  // parameters
+  if (_sdf->HasElement("gravity_source"))
+  {
+    this->dataPtr->sourceName = _sdf->Get<std::string>("gravity_source");
+  }
+
+  if (_sdf->HasElement("gravity_expo"))
+  {
+    this->dataPtr->gravity_expo = _sdf->Get<double>("gravity_expo");
+  }
 }
 
 //////////////////////////////////////////////////
@@ -274,6 +316,25 @@ void ImuPrivate::CreateSensors(const EntityComponentManager &_ecm)
 
   if (!this->initialized)
   {
+    // resolve gravity source model
+    if (!this->sourceName.empty())
+    {
+      this->world = World(this->worldEntity);
+
+      this->sourceModel = Model(
+          this->world.ModelByName(_ecm, this->sourceName));
+      static bool notified{false};
+      if (!this->sourceModel.Valid(_ecm) && !notified)
+      {
+        gzerr << "Imu: gravity source model ["
+                << this->sourceName
+                << "] not found. "
+                "Failed to initialize.\n";
+        notified = true;
+        return;
+      }
+    }
+
     // Create IMUs
     _ecm.Each<components::Imu, components::ParentEntity>(
       [&](const Entity &_entity,
@@ -283,7 +344,7 @@ void ImuPrivate::CreateSensors(const EntityComponentManager &_ecm)
           this->AddSensor(_ecm, _entity, _imu, _parent);
           return true;
         });
-      this->initialized = true;
+    this->initialized = true;
   }
   else
   {
@@ -303,6 +364,37 @@ void ImuPrivate::CreateSensors(const EntityComponentManager &_ecm)
 void ImuPrivate::Update(const EntityComponentManager &_ecm)
 {
   GZ_PROFILE("ImuPrivate::Update");
+
+  // Custom gravity
+  double mass_C = 0.0;
+  math::Pose3d X_WC {};
+  if (this->sourceModel.Valid(_ecm))
+  {
+    // canonical link of gravity source (C for central force)
+    auto link_C = Link(this->sourceModel.CanonicalLink(_ecm));
+
+    // world pose of source
+    X_WC = worldPose(link_C.Entity(), _ecm);
+
+    // mass of source
+    auto *inertialComp_C =
+      _ecm.Component<components::Inertial>(link_C.Entity());
+    {
+      static bool notified{false};
+      if (inertialComp_C == nullptr)
+      {
+        gzerr << "Imu: gravity source model ["
+                << this->sourceName
+                << "] does not have valid inertial. "
+                "Failed to initialize.\n";
+        notified = true;
+        return;
+      }
+    }
+    const auto &inertial_C = inertialComp_C->Data();
+    mass_C = inertial_C.MassMatrix().Mass();
+  }
+
   _ecm.Each<components::Imu,
             components::WorldPose,
             components::AngularVelocity,
@@ -316,6 +408,42 @@ void ImuPrivate::Update(const EntityComponentManager &_ecm)
         auto it = this->entitySensorMap.find(_entity);
         if (it != this->entitySensorMap.end())
         {
+          // Custom gravity
+          if (this->sourceModel.Valid(_ecm))
+          {
+            // world pose of entity
+            const auto &X_WB = _worldPose->Data();
+
+            // position vector from central mass to body
+            auto p_CB_W = X_WB.Pos() - X_WC.Pos();
+
+            // length of position vector
+            double r = p_CB_W.Length();
+
+            // avoid singularity as r -> 0
+            if (std::abs(r) < 1.0E-3)
+            {
+              return true;
+            }
+
+            // inverse radius
+            double one_over_r = 1.0 / r;
+            double r_expo = pow(r, this->gravity_expo);
+
+            // magnitude of acceleration
+            auto a = 1.0 * this->G * mass_C * r_expo;
+
+            // direction of acceleration
+            auto direction = -1.0 * one_over_r * p_CB_W;
+
+            // acceleration
+            auto a_B_W = a * direction;
+
+            it->second->SetGravity(a_B_W);
+
+            gzdbg << "Gravity: " << a_B_W << "\n";
+          }
+
           const auto &imuWorldPose = _worldPose->Data();
           it->second->SetWorldPose(imuWorldPose);
 
@@ -358,9 +486,11 @@ void ImuPrivate::RemoveImuEntities(
       });
 }
 
+//////////////////////////////////////////////////
 GZ_ADD_PLUGIN(Imu, System,
   Imu::ISystemPreUpdate,
-  Imu::ISystemPostUpdate
+  Imu::ISystemPostUpdate,
+  Imu::ISystemConfigure
 )
 
 GZ_ADD_PLUGIN_ALIAS(Imu, "gz::sim::systems::Imu")
