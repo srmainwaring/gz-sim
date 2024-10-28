@@ -441,7 +441,7 @@ void ImuPrivate::Update(const EntityComponentManager &_ecm)
 
             it->second->SetGravity(a_B_W);
 
-            gzdbg << "Gravity: " << a_B_W << "\n";
+            // gzdbg << "Gravity: " << a_B_W << "\n";
           }
 
           const auto &imuWorldPose = _worldPose->Data();
