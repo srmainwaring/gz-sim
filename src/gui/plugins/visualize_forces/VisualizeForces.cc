@@ -505,6 +505,8 @@ void VisualizeForces::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
         elem->QueryDoubleText(&value);
         this->dataPtr->scale = value;
       }
+      gzdbg << "scale: "
+            << this->dataPtr->scale << std::endl;
     }
 
     {
@@ -517,7 +519,9 @@ void VisualizeForces::LoadConfig(const tinyxml2::XMLElement *_pluginElem)
       std::chrono::duration<double> period{rate > 0.0 ? 1.0 / rate : 0.0};
       this->dataPtr->updatePeriod = std::chrono::duration_cast<
           std::chrono::steady_clock::duration>(period);
-    }
+      gzdbg << "update_rate: "
+            << rate << std::endl;
+      }
   }
 
   // Install filter to receive events from the main window.
