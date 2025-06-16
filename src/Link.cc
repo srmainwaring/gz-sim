@@ -594,7 +594,7 @@ void Link::AddWorldWrench(EntityComponentManager &_ecm,
     (*data.mutable_wrenches())[label] = msg;
 
     _ecm.SetChanged(this->dataPtr->id, components::EntityWrenchMap::typeId,
-        ComponentState::PeriodicChange);
+        ComponentState::OneTimeChange);
 
     // {
     //   gzdbg << "Publishing entity wrench map for link ["
