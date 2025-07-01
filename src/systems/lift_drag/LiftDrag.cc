@@ -800,7 +800,7 @@ void LiftDragPrivate::Update(const UpdateInfo &_info,
 
   dragPublisher.SetEntity(this->linkEntity);
   dragPublisher.PublishWorldWrench(_info, _ecm, drag, cpWorld.Cross(drag));
-
+#if 0
   // Debug
   {
     const auto dragI = drag.Normalize();
@@ -839,6 +839,7 @@ void LiftDragPrivate::Update(const UpdateInfo &_info,
     gzdbg << "angFwdToDrag: " << angFwdToDrag.Degree() << " (deg)\n";
     gzdbg << "angFwdToVel: " << angFwdToVel.Degree() << " (deg)\n";
   }
+#endif
 }
 
 //////////////////////////////////////////////////
