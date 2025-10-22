@@ -81,9 +81,9 @@ namespace systems
   /// The EnvironmentPreload can be used to preload a wind field that can
   /// be accessed by the plugin. The column headings used for the wind
   /// field components must match the values assigned the elements:
-  /// - <lookup_wind_x>
-  /// - <lookup_wind_y>
-  /// - <lookup_wind_z>
+  /// - <environment_wind_x>
+  /// - <environment_wind_y>
+  /// - <environment_wind_z>
   ///
   /// If any one of the wind speed fields is set, it is assumed that the
   /// supplied wind field will be used instead of the WindEffects system.

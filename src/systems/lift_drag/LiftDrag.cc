@@ -290,25 +290,25 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
   }
 
   // optional wind field
-  if (_sdf->HasElement("lookup_wind_x"))
+  if (_sdf->HasElement("environment_wind_x"))
   {
     this->useWindField = true;
     this->windFieldKeys[0] =
-      _sdf->Get<std::string>("lookup_wind_x");
+      _sdf->Get<std::string>("environment_wind_x");
   }
 
-  if (_sdf->HasElement("lookup_wind_y"))
+  if (_sdf->HasElement("environment_wind_y"))
   {
     this->useWindField = true;
     this->windFieldKeys[1] =
-      _sdf->Get<std::string>("lookup_wind_y");
+      _sdf->Get<std::string>("environment_wind_y");
   }
 
-  if (_sdf->HasElement("lookup_wind_z"))
+  if (_sdf->HasElement("environment_wind_z"))
   {
     this->useWindField = true;
-    this->windFieldKeys[1] =
-      _sdf->Get<std::string>("lookup_wind_z");
+    this->windFieldKeys[2] =
+      _sdf->Get<std::string>("environment_wind_z");
   }
 
   // If we reached here, we have a valid configuration
@@ -321,12 +321,18 @@ void LiftDragPrivate::Update(
     EntityComponentManager &_ecm)
 {
   GZ_PROFILE("LiftDragPrivate::Update");
+
+  if (this->useWindField)
+  {
+    this->SetupWindField(_info, _ecm);
+  }
+
   // get linear velocity at cp in world frame
-  const auto worldLinVel =
+  const auto worldLinkLinVelComp =
       _ecm.Component<components::WorldLinearVelocity>(this->linkEntity);
-  const auto worldAngVel =
+  const auto worldLinkAngVelComp =
       _ecm.Component<components::WorldAngularVelocity>(this->linkEntity);
-  const auto worldPose =
+  const auto worldLinkPoseComp =
       _ecm.Component<components::WorldPose>(this->linkEntity);
 
   components::JointPosition *controlJointPosition = nullptr;
@@ -336,19 +342,28 @@ void LiftDragPrivate::Update(
         _ecm.Component<components::JointPosition>(this->controlJointEntity);
   }
 
-  if (!worldAngVel || !worldPose)
+  if (!worldLinkAngVelComp || !worldLinkPoseComp)
   {
     return;
   }
 
-  const auto &pose = worldPose->Data();
-  const auto cpWorld = pose.Rot().RotateVector(this->cp);
+  // transform CP vector to world frame and obtain its position 
+  const auto &worldLinkPose = worldLinkPoseComp->Data();
+  const auto worldLinkToCp = worldLinkPose.Rot().RotateVector(this->cp);
+  const auto worldCp = worldLinkPose.Pos() + worldLinkToCp;
 
   // wind linear velocity at the centre of pressure
-  auto windLinearVel = this->WindWorldLinearVelocity(_info, _ecm, cpWorld);
+  auto windLinearVel = this->WindWorldLinearVelocity(
+      _info, _ecm, worldCp);
 
-  auto vel = worldLinVel->Data()
-      + worldAngVel->Data().Cross(cpWorld) - windLinearVel;
+  // auto linkName = _ecm.Component<components::Name>(this->linkEntity)->Data();
+  // gzmsg << "=============================\n"
+  //       << "link: " << linkName << "\n"
+  //       << "worldLinkPose: " << worldLinkPose.Pos() << "\n"
+  //       << "wind: " << windLinearVel << std::endl;
+
+  auto vel = worldLinkLinVelComp->Data()
+      + worldLinkAngVelComp->Data().Cross(worldLinkToCp) - windLinearVel;
 
   if (vel.Length() <= 0.01)
   {
@@ -358,7 +373,7 @@ void LiftDragPrivate::Update(
   const auto velI = vel.Normalized();
 
   // rotate forward and upward vectors into world frame
-  const auto forwardI = pose.Rot().RotateVector(this->forward);
+  const auto forwardI = worldLinkPose.Rot().RotateVector(this->forward);
 
   if (!this->reversible && forwardI.Dot(vel) <= 0.0)
   {
@@ -377,7 +392,7 @@ void LiftDragPrivate::Update(
   }
   else
   {
-    upwardI = pose.Rot().RotateVector(this->upward);
+    upwardI = worldLinkPose.Rot().RotateVector(this->upward);
   }
 
   // spanwiseI: a vector normal to lift-drag-plane described in world frame
@@ -555,14 +570,14 @@ void LiftDragPrivate::Update(
   //
   // \todo(addisu) Create a convenient API for applying forces at offset
   // positions
-  const auto totalTorque = torque + cpWorld.Cross(force);
+  const auto totalTorque = torque + worldLinkToCp.Cross(force);
   Link link(this->linkEntity);
   link.AddWorldWrench(_ecm, force, totalTorque);
 
   // Debug
   // auto linkName = _ecm.Component<components::Name>(this->linkEntity)->Data();
   // gzdbg << "=============================\n";
-  // gzdbg << "Link: [" << linkName << "] pose: [" << pose
+  // gzdbg << "Link: [" << linkName << "] linkPose: [" << worldLinkPose
   //        << "] dynamic pressure: [" << q << "]\n";
   // gzdbg << "spd: [" << vel.Length() << "] vel: [" << vel << "]\n";
   // gzdbg << "LD plane spd: [" << velInLDPlane.Length() << "] vel : ["
