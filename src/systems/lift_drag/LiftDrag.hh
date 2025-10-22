@@ -76,6 +76,18 @@ namespace systems
   ///   surface deflection angle
   /// - `<control_joint_rad_to_cl>`: How much to change CL per radian of
   ///   control joint surface angle.
+  ///
+  /// ### Load external wind environment
+  /// The EnvironmentPreload can be used to preload a wind field that can
+  /// be accessed by the plugin. The column headings used for the wind
+  /// field components must match the values assigned the elements:
+  /// - <lookup_wind_x>
+  /// - <lookup_wind_y>
+  /// - <lookup_wind_z>
+  ///
+  /// If any one of the wind speed fields is set, it is assumed that the
+  /// supplied wind field will be used instead of the WindEffects system.
+  ///
   class LiftDrag
       : public System,
         public ISystemConfigure,

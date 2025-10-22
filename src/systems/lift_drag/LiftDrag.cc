@@ -55,8 +55,28 @@ class gz::sim::systems::LiftDragPrivate
 
   /// \brief Compute lift and drag forces and update the corresponding
   /// components
-  /// \param[in] _ecm Immutable reference to the EntityComponentManager
-  public: void Update(EntityComponentManager &_ecm);
+  /// \param[in] _info Reference to the UpdateInfo
+  /// \param[in] _ecm Reference to the EntityComponentManager
+  public: void Update(
+      const UpdateInfo &_info,
+      EntityComponentManager &_ecm);
+
+  /// \brief Set up the wind field
+  /// \param[in] _info Reference to the UpdateInfo
+  /// \param[in] _ecm - The Entity Component Manager
+  public: void SetupWindField(
+      const UpdateInfo &_info,
+      const EntityComponentManager &_ecm);
+
+  /// \brief Retrieve wind velocity data from the environment
+  /// \param[in] _info Reference to the UpdateInfo
+  /// \param[in] _ecm - The Entity Component Manager
+  /// \param[in] _position - Position in world coordinates
+  /// \return The wind velocity at this position
+  public: math::Vector3d WindWorldLinearVelocity(
+    const UpdateInfo &_info,
+    const EntityComponentManager &_ecm,
+    const math::Vector3d &_position);
 
   /// \brief Model interface
   public: Model model{kNullEntity};
@@ -147,6 +167,20 @@ class gz::sim::systems::LiftDragPrivate
 
   /// \brief Initialization flag
   public: bool initialized{false};
+
+  /// \brief Use wind field if true
+  public: bool useWindField {false};
+
+  /// \brief Wind field column keys
+  public: std::string windFieldKeys[3];
+
+  /// \brief Wind field environment
+  public: std::shared_ptr<gz::sim::components::EnvironmentalData> windField;
+
+  /// \brief Wind field time step iterators
+  public: std::optional<gz::math::InMemorySession<double, double>>
+      windFieldSession[3];
+
 };
 
 //////////////////////////////////////////////////
@@ -255,18 +289,36 @@ void LiftDragPrivate::Load(const EntityComponentManager &_ecm,
     }
   }
 
+  // optional wind field
+  if (_sdf->HasElement("lookup_wind_x"))
+  {
+    this->useWindField = true;
+    this->windFieldKeys[0] =
+      _sdf->Get<std::string>("lookup_wind_x");
+  }
+
+  if (_sdf->HasElement("lookup_wind_y"))
+  {
+    this->useWindField = true;
+    this->windFieldKeys[1] =
+      _sdf->Get<std::string>("lookup_wind_y");
+  }
+
+  if (_sdf->HasElement("lookup_wind_z"))
+  {
+    this->useWindField = true;
+    this->windFieldKeys[1] =
+      _sdf->Get<std::string>("lookup_wind_z");
+  }
+
   // If we reached here, we have a valid configuration
   this->validConfig = true;
 }
 
 //////////////////////////////////////////////////
-LiftDrag::LiftDrag()
-    : System(), dataPtr(std::make_unique<LiftDragPrivate>())
-{
-}
-
-//////////////////////////////////////////////////
-void LiftDragPrivate::Update(EntityComponentManager &_ecm)
+void LiftDragPrivate::Update(
+    const gz::sim::UpdateInfo &_info,
+    EntityComponentManager &_ecm)
 {
   GZ_PROFILE("LiftDragPrivate::Update");
   // get linear velocity at cp in world frame
@@ -277,13 +329,6 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
   const auto worldPose =
       _ecm.Component<components::WorldPose>(this->linkEntity);
 
-  // get wind as a component from the _ecm
-  components::WorldLinearVelocity *windLinearVel = nullptr;
-  if(_ecm.EntityByComponents(components::Wind()) != kNullEntity){
-    Entity windEntity = _ecm.EntityByComponents(components::Wind());
-    windLinearVel =
-        _ecm.Component<components::WorldLinearVelocity>(windEntity);
-  }
   components::JointPosition *controlJointPosition = nullptr;
   if (this->controlJointEntity != kNullEntity)
   {
@@ -291,19 +336,19 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
         _ecm.Component<components::JointPosition>(this->controlJointEntity);
   }
 
-  if (!worldLinVel || !worldAngVel || !worldPose)
+  if (!worldAngVel || !worldPose)
   {
     return;
   }
 
   const auto &pose = worldPose->Data();
   const auto cpWorld = pose.Rot().RotateVector(this->cp);
-  auto vel = worldLinVel->Data() + worldAngVel->Data().Cross(
-  cpWorld);
-  if (windLinearVel != nullptr){
-    vel = worldLinVel->Data() + worldAngVel->Data().Cross(
-    cpWorld) - windLinearVel->Data();
-  }
+
+  // wind linear velocity at the centre of pressure
+  auto windLinearVel = this->WindWorldLinearVelocity(_info, _ecm, cpWorld);
+
+  auto vel = worldLinVel->Data()
+      + worldAngVel->Data().Cross(cpWorld) - windLinearVel;
 
   if (vel.Length() <= 0.01)
   {
@@ -539,6 +584,141 @@ void LiftDragPrivate::Update(EntityComponentManager &_ecm)
   // gzdbg << "totalTorque: " << totalTorque << "\n";
 }
 
+/////////////////////////////////////////////////
+void LiftDragPrivate::SetupWindField(
+  const gz::sim::UpdateInfo &_info,
+  const EntityComponentManager &_ecm)
+{
+  const auto currTime = _info.simTime;
+
+  _ecm.EachNew<components::Environment>([&](const Entity &/*_entity*/,
+    const components::Environment *_environment) -> bool
+  {
+    this->windField = _environment->Data();
+
+    for (std::size_t i = 0; i < 3; i++)
+    {
+      if (!this->windFieldKeys[i].empty())
+      {
+        if (!this->windField->frame.Has(this->windFieldKeys[i]))
+        {
+          gzwarn << "Environmental system could not find wind field "
+            << this->windFieldKeys[i] << "\n";
+          continue;
+        }
+
+        this->windFieldSession[i] =
+          this->windField->frame[this->windFieldKeys[i]].CreateSession();
+        if (!this->windField->staticTime)
+        {
+          this->windFieldSession[i] =
+            this->windField->frame[this->windFieldKeys[i]].StepTo(
+              *this->windFieldSession[i],
+              std::chrono::duration<double>(currTime).count());
+        }
+
+        if(!this->windFieldSession[i].has_value())
+        {
+          gzerr << "Exceeded time stamp." << std::endl;
+        }
+      }
+    }
+    return true;
+  });
+}
+
+/////////////////////////////////////////////////
+math::Vector3d LiftDragPrivate::WindWorldLinearVelocity(
+  const gz::sim::UpdateInfo &_info,
+  const EntityComponentManager &_ecm,
+  const math::Vector3d &_position)
+{
+  const auto currTime = _info.simTime;
+
+  math::Vector3d windLinearVel(0, 0, 0);
+
+  // use the global wind system
+  if (!this->useWindField)
+  {
+    // get wind as a component from the _ecm
+    const components::WorldLinearVelocity *windLinearVelComp = nullptr;
+    if (_ecm.EntityByComponents(components::Wind()) != kNullEntity)
+    {
+      Entity windEntity = _ecm.EntityByComponents(components::Wind());
+      windLinearVelComp =
+          _ecm.Component<components::WorldLinearVelocity>(windEntity);
+    }
+
+    if (windLinearVelComp != nullptr)
+    {
+      windLinearVel = windLinearVelComp->Data();
+    }
+
+    return windLinearVel;
+  }
+
+  // otherwise use the wind field if available
+  if (!this->windField ||
+      !(this->windFieldSession[0].has_value() ||
+        this->windFieldSession[1].has_value() || 
+        this->windFieldSession[2].has_value()))
+  {
+    return windLinearVel;
+  }
+
+  for (std::size_t i = 0; i < 3; i++)
+  {
+    if (!this->windFieldKeys[i].empty())
+    {
+      if (!this->windField->staticTime)
+      {
+        this->windFieldSession[i] =
+          this->windField->frame[this->windFieldKeys[i]].StepTo(
+            *this->windFieldSession[i],
+            std::chrono::duration<double>(currTime).count());
+      }
+
+      if (!this->windFieldSession[i].has_value())
+      {
+        gzerr << "Time exceeded" << std::endl;
+        continue;
+      }
+
+      auto position = getGridFieldCoordinates(
+        _ecm, _position, this->windField);
+
+      if (!position.has_value())
+      {
+        gzerr << "Coordinate conversion failed" << std::endl;
+        continue;
+      }
+
+      auto data = this->windField->frame[this->windFieldKeys[i]].LookUp(
+        this->windFieldSession[i].value(), position.value());
+      if (!data.has_value())
+      {
+        auto bounds =
+          this->windField->frame[this->windFieldKeys[i]].Bounds(
+            this->windFieldSession[i].value());
+        gzwarn << "Failed to acquire value perhaps out of field?\n"
+          << "Bounds are " << bounds.first << ", "
+          << bounds.second << std::endl;
+        continue;
+      }
+
+      windLinearVel[i] = data.value();
+    }
+  }
+
+  return windLinearVel;
+}
+
+//////////////////////////////////////////////////
+LiftDrag::LiftDrag()
+    : System(), dataPtr(std::make_unique<LiftDragPrivate>())
+{
+}
+
 //////////////////////////////////////////////////
 void LiftDrag::Configure(const Entity &_entity,
                          const std::shared_ptr<const sdf::Element> &_sdf,
@@ -590,7 +770,7 @@ void LiftDrag::PreUpdate(const UpdateInfo &_info, EntityComponentManager &_ecm)
   // above
   if (this->dataPtr->initialized && this->dataPtr->validConfig)
   {
-    this->dataPtr->Update(_ecm);
+    this->dataPtr->Update(_info, _ecm);
   }
 }
 
