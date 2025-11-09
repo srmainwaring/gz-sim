@@ -23,6 +23,9 @@
       filename="gz-sim-scene-broadcaster-system"
       name="gz::sim::systems::SceneBroadcaster">
     </plugin>
+    <plugin filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
 
     <scene>
       <ambient>0.8 0.8 0.8 1.0</ambient>
@@ -3869,6 +3872,11 @@
           </box>
         </geometry>
       </collision>
+      <sensor name="imu_sensor" type="imu">
+        <pose degrees="true">0 0 0 180 0 0</pose>
+        <always_on>1</always_on>
+        <update_rate>1000.0</update_rate>
+      </sensor>
     </link>
 
     <link name='left_wheel'>
@@ -4047,6 +4055,11 @@
           </box>
         </geometry>
       </collision>
+      <sensor name="imu_sensor" type="imu">
+        <pose degrees="true">0 0 0 180 0 0</pose>
+        <always_on>1</always_on>
+        <update_rate>1000.0</update_rate>
+      </sensor>
     </link>
 
     <link name='left_wheel'>
@@ -4212,8 +4225,6 @@
       </geometry>
     </performer>
 
-
-
     <level name="level0">
       <pose>20 -40 2.5 0 0 0</pose>
       <geometry>
@@ -4232,6 +4243,16 @@
         </box>
       </geometry>
       <ref>tile_2</ref>
+    </level>
+
+    <level name="level2">
+      <pose>20 0 2.5 0 0 0</pose>
+      <geometry>
+        <box>
+          <size>40 40 1000</size>
+        </box>
+      </geometry>
+      <ref>tile_3</ref>
     </level>
 
     <level name="level3">
@@ -4403,8 +4424,6 @@
       </geometry>
       <ref>tile_20</ref>
     </level>
-
-
 
   </plugin>
 
