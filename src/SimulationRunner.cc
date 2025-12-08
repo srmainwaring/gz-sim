@@ -63,6 +63,7 @@
 #include "gz/sim/Util.hh"
 #include "gz/transport/TopicUtils.hh"
 #include "network/NetworkManagerPrimary.hh"
+#include "network/NetworkManagerSecondary.hh"
 #include "LevelManager.hh"
 #include "SdfGenerator.hh"
 
@@ -264,6 +265,7 @@ SimulationRunner::SimulationRunner(const sdf::World &_world,
   this->levelMgr = std::make_unique<LevelManager>(this,
       this->serverConfig.UseLevels());
 
+  gzdbg << "SimulationRunner: createEntities: " << _createEntities << std::endl;
   if (_createEntities)
   {
     this->SetWorldSdf(_world);
