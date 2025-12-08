@@ -32,6 +32,7 @@
 #include <gz/common/Util.hh>
 #include <gz/common/Profiler.hh>
 
+#include "gz/sim/components/ParentEntity.hh"
 #include "gz/sim/components/PerformerAffinity.hh"
 #include "gz/sim/components/PerformerLevels.hh"
 #include "gz/sim/Conversions.hh"
@@ -263,6 +264,45 @@ void NetworkManagerPrimary::PopulateAffinities(
 
       return true;
     });
+
+  //! @note debug info
+#if 0
+  gzdbg << "PopulateAffinities..." << std::endl;
+  // all performers
+  gzdbg << "Performers:" << std::endl;
+  for (auto performer : allPerformers)
+  {
+    auto parent =
+        this->dataPtr->ecm->Component<components::ParentEntity>(performer);
+    if (parent == nullptr)
+    {
+      gzerr << "Failed to get parent for performer [" << performer << "]"
+             << std::endl;
+      continue;
+    }
+    auto parentEntity = parent->Data();
+    gzdbg << "  Performer: [" << performer << "], "
+          << "Parent: [" << parentEntity << "]"
+          <<  std:: endl;
+  }
+  // level to performer
+  gzdbg << "Levels:" << std::endl;
+  for (auto [level, perfEntities] : lToPNew)
+  {
+    gzdbg << "  Level: [" << level << "]" << std::endl;
+    for (auto performer : perfEntities)
+    {
+        gzdbg << "    Performer: [" << performer << "]" << std::endl;
+    }
+  }
+  // performer to secondary
+  gzdbg << "Secondary:" << std::endl;
+  for (auto [performer, secondary] : pToSPrevious)
+  {
+    gzdbg << "  Performer: [" << performer << "], "
+          << "Secondary: [" << secondary << "]" << std::endl;
+  }
+#endif // DEBUG
 
   // First assignment: distribute levels evenly across secondaries
   if (pToSPrevious.empty())
