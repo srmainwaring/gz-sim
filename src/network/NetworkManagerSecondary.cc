@@ -111,6 +111,20 @@ void NetworkManagerSecondary::OnStep(
 {
   GZ_PROFILE("NetworkManagerSecondary::OnStep");
 
+  // Do not print debug message if paused.
+#if 0
+  if (!_msg.stats().paused())
+  {
+    gzdbg << "NetworkManagerSecondary::OnStep [" << this->Namespace() << "]"
+          << std::endl;
+    if (_msg.affinity_size() > 0)
+    {
+      gzdbg << "Secondary: SimulationStep:\n"
+            << _msg.DebugString() << std::endl;
+    }
+  }
+#endif // DEBUG
+
   // Throttle the number of step messages going to the debug output.
   if (!_msg.stats().paused() && _msg.stats().iterations() % 1000 == 0)
   {
@@ -201,6 +215,13 @@ void NetworkManagerSecondary::OnStep(
 
   // Update state with all the performer's entities
   std::unordered_set<Entity> entities;
+#if 0
+  if (!_msg.stats().paused())
+  {
+    gzdbg << "Secondary: performer: size: "
+          << this->performers.size() << std::endl;
+  }
+#endif // DEBUG
   for (const auto &perfEntity : this->performers)
   {
     // Performer model
@@ -217,6 +238,14 @@ void NetworkManagerSecondary::OnStep(
     // Also include the performer's model entity
     auto modelEntity = parent->Data();
     entities.insert(modelEntity);
+#if 0
+    if (!_msg.stats().paused())
+    {
+      gzdbg << "Secondary: performer [" << perfEntity << "], "
+            << "parent: [" << modelEntity << "]"
+            <<  std:: endl;
+    }
+#endif // DEBUG
     auto children = this->dataPtr->ecm->Descendants(modelEntity);
     entities.insert(children.begin(), children.end());
   }
