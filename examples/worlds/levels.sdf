@@ -2,7 +2,7 @@
 <!--
   Gazebo level manager demo
 
-  Start gazebo using the "--levels" flag.
+  Start gazebo using the "-/-levels" flag.
   Start the simulation and try sending commands:
 
     gz topic -t "/model/vehicle_blue/cmd_vel" -m gz.msgs.Twist -p "linear: {x: 4.0}"
@@ -76,7 +76,7 @@
 
     <!-- Grid tiles -->
 
-    <model name="tile_1">
+    <!-- <model name="tile_1">
       <pose>20 -40 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -262,9 +262,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_2">
+    <!-- <model name="tile_2">
       <pose>20 -20 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -450,7 +450,7 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
     <model name="tile_3">
       <pose>20 0 0 0 0 0</pose>
@@ -640,7 +640,7 @@
       </link>
     </model>
 
-    <model name="tile_4">
+    <!-- <model name="tile_4">
       <pose>20 20 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -826,9 +826,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_5">
+    <!-- <model name="tile_5">
       <pose>20 40 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -1014,9 +1014,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_6">
+    <!-- <model name="tile_6">
       <pose>40 -40 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -1202,9 +1202,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_7">
+    <!-- <model name="tile_7">
       <pose>40 -20 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -1390,7 +1390,7 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
     <model name="tile_8">
       <pose>40 0 0 0 0 1.5707963267948966</pose>
@@ -1580,7 +1580,7 @@
       </link>
     </model>
 
-    <model name="tile_9">
+    <!-- <model name="tile_9">
       <pose>40 20 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -1766,9 +1766,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_10">
+    <!-- <model name="tile_10">
       <pose>40 40 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -1954,9 +1954,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_11">
+    <!-- <model name="tile_11">
       <pose>60 -40 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -2142,9 +2142,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_12">
+    <!-- <model name="tile_12">
       <pose>60 -20 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -2330,7 +2330,7 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
     <model name="tile_13">
       <pose>60 0 0 0 0 1.5707963267948966</pose>
@@ -2520,7 +2520,7 @@
       </link>
     </model>
 
-    <model name="tile_14">
+    <!-- <model name="tile_14">
       <pose>60 20 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -2706,9 +2706,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_15">
+    <!-- <model name="tile_15">
       <pose>60 40 0 0 0 3.141592653589793</pose>
       <static>true</static>
       <link name="link">
@@ -2894,9 +2894,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_16">
+    <!-- <model name="tile_16">
       <pose>80 -40 0 0 0 -1.5707963267948966</pose>
       <static>true</static>
       <link name="link">
@@ -3082,9 +3082,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_17">
+    <!-- <model name="tile_17">
       <pose>80 -20 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -3270,7 +3270,7 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
     <model name="tile_18">
       <pose>80 0 0 0 0 0</pose>
@@ -3460,7 +3460,7 @@
       </link>
     </model>
 
-    <model name="tile_19">
+    <!-- <model name="tile_19">
       <pose>80 20 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -3646,9 +3646,9 @@
         </visual>
 
       </link>
-    </model>
+    </model> -->
 
-    <model name="tile_20">
+    <!-- <model name="tile_20">
       <pose>80 40 0 0 0 0</pose>
       <static>true</static>
       <link name="link">
@@ -3834,9 +3834,7 @@
         </visual>
 
       </link>
-    </model>
-
-
+    </model> -->
 
   <model name='vehicle_red'>
     <pose>0 0 0.325 0 0 0</pose>
@@ -4019,9 +4017,14 @@
       <wheel_radius>0.3</wheel_radius>
     </plugin>
 
+    <plugin
+      filename="gz-sim-level-debug-system"
+      name="gz::sim::systems::LevelDebug">
+    </plugin>
+
   </model>
 
-  <model name='vehicle_blue'>
+  <!-- <model name='vehicle_blue'>
     <pose>0 20 0.325 0 0 0</pose>
     <link name='chassis'>
       <pose>-0.151427 -0 0.175 0 -0 0</pose>
@@ -4202,8 +4205,7 @@
       <wheel_radius>0.3</wheel_radius>
     </plugin>
 
-  </model>
-
+  </model> -->
 
   <plugin name="gz::sim" filename="dummy">
 
@@ -4216,16 +4218,16 @@
       </geometry>
     </performer>
 
-    <performer name="perf_vehicle_blue">
+    <!-- <performer name="perf_vehicle_blue">
       <ref>vehicle_blue</ref>
       <geometry>
         <box>
           <size>2 2 2</size>
         </box>
       </geometry>
-    </performer>
+    </performer> -->
 
-    <level name="level0">
+    <!-- <level name="level0">
       <pose>20 -40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4233,9 +4235,9 @@
         </box>
       </geometry>
       <ref>tile_1</ref>
-    </level>
+    </level> -->
 
-    <level name="level1">
+    <!-- <level name="level1">
       <pose>20 -20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4243,6 +4245,16 @@
         </box>
       </geometry>
       <ref>tile_2</ref>
+    </level> -->
+
+    <level name="level2">
+      <pose>20 0 2.5 0 0 0</pose>
+      <geometry>
+        <box>
+          <size>40 40 1000</size>
+        </box>
+      </geometry>
+      <ref>tile_3</ref>
     </level>
 
     <level name="level2">
@@ -4255,7 +4267,7 @@
       <ref>tile_3</ref>
     </level>
 
-    <level name="level3">
+    <!-- <level name="level3">
       <pose>20 20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4263,9 +4275,9 @@
         </box>
       </geometry>
       <ref>tile_4</ref>
-    </level>
+    </level> -->
 
-    <level name="level4">
+    <!-- <level name="level4">
       <pose>20 40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4273,9 +4285,9 @@
         </box>
       </geometry>
       <ref>tile_5</ref>
-    </level>
+    </level> -->
 
-    <level name="level5">
+    <!-- <level name="level5">
       <pose>40 -40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4283,9 +4295,9 @@
         </box>
       </geometry>
       <ref>tile_6</ref>
-    </level>
+    </level> -->
 
-    <level name="level6">
+    <!-- <level name="level6">
       <pose>40 -20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4293,7 +4305,7 @@
         </box>
       </geometry>
       <ref>tile_7</ref>
-    </level>
+    </level> -->
 
     <level name="level7">
       <pose>40 0 2.5 0 0 0</pose>
@@ -4305,7 +4317,7 @@
       <ref>tile_8</ref>
     </level>
 
-    <level name="level8">
+    <!-- <level name="level8">
       <pose>40 20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4313,9 +4325,9 @@
         </box>
       </geometry>
       <ref>tile_9</ref>
-    </level>
+    </level> -->
 
-    <level name="level9">
+    <!-- <level name="level9">
       <pose>40 40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4323,9 +4335,9 @@
         </box>
       </geometry>
       <ref>tile_10</ref>
-    </level>
+    </level> -->
 
-    <level name="level10">
+    <!-- <level name="level10">
       <pose>60 -40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4333,9 +4345,9 @@
         </box>
       </geometry>
       <ref>tile_11</ref>
-    </level>
+    </level> -->
 
-    <level name="level11">
+    <!-- <level name="level11">
       <pose>60 -20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4343,7 +4355,7 @@
         </box>
       </geometry>
       <ref>tile_12</ref>
-    </level>
+    </level> -->
 
     <level name="level12">
       <pose>60 0 2.5 0 0 0</pose>
@@ -4355,7 +4367,7 @@
       <ref>tile_13</ref>
     </level>
 
-    <level name="level13">
+    <!-- <level name="level13">
       <pose>60 20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4363,9 +4375,9 @@
         </box>
       </geometry>
       <ref>tile_14</ref>
-    </level>
+    </level> -->
 
-    <level name="level14">
+    <!-- <level name="level14">
       <pose>60 40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4373,9 +4385,9 @@
         </box>
       </geometry>
       <ref>tile_15</ref>
-    </level>
+    </level> -->
 
-    <level name="level15">
+    <!-- <level name="level15">
       <pose>80 -40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4383,9 +4395,9 @@
         </box>
       </geometry>
       <ref>tile_16</ref>
-    </level>
+    </level> -->
 
-    <level name="level16">
+    <!-- <level name="level16">
       <pose>80 -20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4393,7 +4405,7 @@
         </box>
       </geometry>
       <ref>tile_17</ref>
-    </level>
+    </level> -->
 
     <level name="level17">
       <pose>80 0 2.5 0 0 0</pose>
@@ -4405,7 +4417,7 @@
       <ref>tile_18</ref>
     </level>
 
-    <level name="level18">
+    <!-- <level name="level18">
       <pose>80 20 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4413,9 +4425,9 @@
         </box>
       </geometry>
       <ref>tile_19</ref>
-    </level>
+    </level> -->
 
-    <level name="level19">
+    <!-- <level name="level19">
       <pose>80 40 2.5 0 0 0</pose>
       <geometry>
         <box>
@@ -4423,7 +4435,7 @@
         </box>
       </geometry>
       <ref>tile_20</ref>
-    </level>
+    </level> -->
 
   </plugin>
 
